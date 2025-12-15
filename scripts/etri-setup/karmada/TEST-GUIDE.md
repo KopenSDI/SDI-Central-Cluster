@@ -347,3 +347,5 @@ watch -n 2 'kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config get deplo
 watch -n 2 'kubectl get pods -n karmada-test'
 ```
 
+
+

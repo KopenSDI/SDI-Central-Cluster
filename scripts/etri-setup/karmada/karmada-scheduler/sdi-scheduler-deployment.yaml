@@ -1,0 +1,254 @@
+# SDI 스케줄러 배포 파일 - ETRI 설치용
+# 이미지: ketidevit2/karmada-multicluster-scheduler:0.0.1
+
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sdi-scheduler
+  namespace: karmada-system
+---
+# ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sdi-scheduler
+rules:
+# Karmada 리소스 권한
+- apiGroups:
+  - "cluster.karmada.io"
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "work.karmada.io"
+  resources:
+  - resourcebindings
+  - clusterresourcebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - "work.karmada.io"
+  resources:
+  - resourcebindings/status
+  - clusterresourcebindings/status
+  verbs:
+  - update
+  - patch
+- apiGroups:
+  - "policy.karmada.io"
+  resources:
+  - propagationpolicies
+  - clusterpropagationpolicies
+  verbs:
+  - get
+  - list
+  - watch
+# 이벤트 생성 권한
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+# ConfigMap/Secret 읽기
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+# 서비스 디스커버리
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sdi-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sdi-scheduler
+subjects:
+- kind: ServiceAccount
+  name: sdi-scheduler
+  namespace: karmada-system
+---
+# Secret (Karmada kubeconfig)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sdi-scheduler-config
+  namespace: karmada-system
+type: Opaque
+stringData:
+  karmada.config: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+        certificate-authority: /etc/karmada/pki/ca.crt
+        server: https://karmada-apiserver.karmada-system.svc.cluster.local:5443
+      name: karmada-apiserver
+    contexts:
+    - context:
+        cluster: karmada-apiserver
+        user: karmada-apiserver
+      name: karmada-apiserver
+    current-context: karmada-apiserver
+    users:
+    - name: karmada-apiserver
+      user:
+        client-certificate: /etc/karmada/pki/karmada.crt
+        client-key: /etc/karmada/pki/karmada.key
+---
+# ConfigMap (환경 변수 - ALE 파라미터)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sdi-scheduler-env
+  namespace: karmada-system
+data:
+  MALE_ACCURACY: "90"
+  MALE_LATENCY: "100"
+  MALE_ENERGY: "50"
+  SERVICE_TYPE: "inference"
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sdi-scheduler
+  namespace: karmada-system
+  labels:
+    app: sdi-scheduler
+    scheduler-type: custom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sdi-scheduler
+  template:
+    metadata:
+      labels:
+        app: sdi-scheduler
+        scheduler-type: custom
+    spec:
+      serviceAccountName: sdi-scheduler
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      containers:
+      - name: sdi-scheduler
+        image: ketidevit2/karmada-multicluster-scheduler:0.0.1 # 이미지 수정
+        imagePullPolicy: Always
+        command:
+        - /bin/sdi-scheduler
+        args:
+        - --kubeconfig=/etc/karmada/config/karmada.config
+        - --scheduler-name=sdi-scheduler
+        - --enable-scheduler-estimator=false
+        - --feature-gates=AllAlpha=true,AllBeta=true
+        - --logging-format=json
+        - --v=4
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        envFrom:
+        - configMapRef:
+            name: sdi-scheduler-env
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 10351
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10351
+            scheme: HTTP
+          failureThreshold: 3
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: karmada-config
+          mountPath: /etc/karmada/config
+          readOnly: true
+        - name: karmada-cert
+          mountPath: /etc/karmada/pki
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: karmada-config
+        secret:
+          secretName: sdi-scheduler-config
+      - name: karmada-cert
+        secret:
+          secretName: karmada-cert
+---
+# Service (메트릭 및 헬스체크)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sdi-scheduler-metrics
+  namespace: karmada-system
+  labels:
+    app: sdi-scheduler
+spec:
+  selector:
+    app: sdi-scheduler
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: health
+    port: 10351
+    targetPort: 10351
+    protocol: TCP
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,5 @@
+resources:
+- mutatingwebhook.yaml
+- validatingwebhook.yaml
+- service.yaml
+

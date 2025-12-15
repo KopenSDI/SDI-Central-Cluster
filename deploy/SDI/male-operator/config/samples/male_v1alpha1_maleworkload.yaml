@@ -1,0 +1,43 @@
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: llm-inference-workload
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-llm
+  mission: "llm-inference"
+  importance:
+    accuracy: 0.7
+    latency: 0.8
+    energy: 0.2
+  allowPolicyOverride: true
+  schedulingHints:
+    addLabels:
+      "male.keti.dev/mission": "llm-inference"
+    addAnnotations:
+      "male.keti.dev/score-source": "operator"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-llm
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llm-inference
+  template:
+    metadata:
+      labels:
+        app: llm-inference
+    spec:
+      containers:
+      - name: llm-container
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+

@@ -38,3 +38,5 @@ echo ""
 echo "확인:"
 echo "  kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config get ns ${TEST_NAMESPACE}"
 
+
+

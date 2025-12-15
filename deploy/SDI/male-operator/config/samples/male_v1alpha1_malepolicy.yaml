@@ -1,0 +1,48 @@
+apiVersion: male.keti.dev/v1alpha1
+kind: MalePolicy
+metadata:
+  name: default-male-policy
+spec:
+  weights:
+    accuracy: 0.5
+    latency: 0.3
+    energy: 0.2
+  bounds:
+    accuracy:
+      min: 0.0
+      max: 1.0
+    latency:
+      min: 0.0
+      max: 1.0
+    energy:
+      min: 0.0
+      max: 1.0
+  override:
+    enabled: true
+    source:
+      type: ConfigMap
+      name: male-policy-overrides
+      namespace: kube-system
+    webhookReceiver:
+      enabled: true
+      serviceName: male-operator-webhook
+      port: 9443
+      path: /override
+  priorityBuckets:
+    - name: male-low
+      min: 0.0
+      max: 0.29
+      priorityValue: 100
+    - name: male-medium
+      min: 0.30
+      max: 0.59
+      priorityValue: 1000
+    - name: male-high
+      min: 0.60
+      max: 0.79
+      priorityValue: 10000
+    - name: male-critical
+      min: 0.80
+      max: 1.0
+      priorityValue: 100000
+

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: male-policy-overrides
+  namespace: kube-system
+data:
+  # Override for specific workload: <namespace>.<maleworkload-name>.json
+  default.llm-inference-workload.json: |
+    {
+      "accuracy": 0.75,
+      "latency": 0.9,
+      "energy": 0.1,
+      "reason": "night-traffic-peak"
+    }
+  # Generic override: <maleworkload-name>.json
+  # example-workload.json: |
+  #   {
+  #     "accuracy": 0.8,
+  #     "latency": 0.7,
+  #     "energy": 0.3
+  #   }
+

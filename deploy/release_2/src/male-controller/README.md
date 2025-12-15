@@ -3,9 +3,9 @@
 
 ## Description
 
-MALE Controller는 KETI-SDI(한국전자통신연구원 소프트웨어 정의 인프라) 프로젝트의 일부로, Kubernetes 환경에서 머신러닝 워크로드의 성능 요구사항을 동적으로 관리하는 Custom Resource Definition(CRD) 기반 컨트롤러입니다.
+ Kubernetes 환경에서  워크로드의 성능 요구사항을 동적으로 관리하는 Custom Resource Definition(CRD) 기반 컨트롤러
 
-머신러닝 워크로드의 **정확도(Accuracy)**, **지연시간(Latency)**, **전력효율성(Energy)** 요구사항을 정책으로 정의하고, 이를 실행 중인 워크로드에 자동으로 적용합니다.
+머신러닝 워크로드의 **정확도(Accuracy)**, **지연시간(Latency)**, **전력효율성(Energy)** 요구사항을 정책으로 정의하고, 이를 실행 중인 워크로드에 자동으로 적용
 
 ## 주요 기능
 
@@ -231,7 +231,7 @@ make deploy IMG=<some-registry>/male-controller:tag
 
 ### Karmada 다중 클러스터 통합
 
-MALE Controller는 Karmada 환경에서 다중 클러스터 정책 적용을 지원합니다:
+MALE Controller는 Karmada 환경에서 다중 클러스터 정책 적용을 지원
 
 #### 🔧 **클러스터 자동 인식**
 ```yaml

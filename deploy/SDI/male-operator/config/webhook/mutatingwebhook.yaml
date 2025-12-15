@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mmalepolicy.kb.io
+webhooks:
+- name: mmalepolicy.kb.io
+  clientConfig:
+    service:
+      namespace: male-operator-system
+      name: male-operator-webhook-service
+      path: /mutate-pods
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+  admissionReviewVersions:
+  - v1
+  sideEffects: None
+

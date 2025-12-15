@@ -1,0 +1,4 @@
+resources:
+- bases/male.keti.dev_malepolicies.yaml
+- bases/male.keti.dev_maleworkloads.yaml
+

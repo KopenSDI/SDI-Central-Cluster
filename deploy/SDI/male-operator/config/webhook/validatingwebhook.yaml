@@ -1,0 +1,50 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vmalepolicy.kb.io
+webhooks:
+- name: vmalepolicy.kb.io
+  clientConfig:
+    service:
+      namespace: male-operator-system
+      name: male-operator-webhook-service
+      path: /validate-male-keti-dev-v1alpha1-malepolicy
+  rules:
+  - apiGroups:
+    - male.keti.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - malepolicies
+  admissionReviewVersions:
+  - v1
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vmaleworkload.kb.io
+webhooks:
+- name: vmaleworkload.kb.io
+  clientConfig:
+    service:
+      namespace: male-operator-system
+      name: male-operator-webhook-service
+      path: /validate-male-keti-dev-v1alpha1-maleworkload
+  rules:
+  - apiGroups:
+    - male.keti.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - maleworkloads
+  admissionReviewVersions:
+  - v1
+  sideEffects: None
+
