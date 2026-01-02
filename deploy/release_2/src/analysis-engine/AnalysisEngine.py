@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Optional
 import argparse
-from influx_reader import InfluxReader, BOTS
+from influx_reader import InfluxReader, get_available_bots, INFLUX_URL, INFLUX_ORG
 
 from Analysis.Analysis_Model import AnalysisModel
 from Analysis.Analysis_Controller import AnalysisController
@@ -45,15 +45,13 @@ class KETI_AnalysisEngine:
     
     def test_update_from_influx(self):
         print(f"{self.engine_Name} InfluxDB 데이터 조회 및 디바이스 업데이트 중!!!")
-        print(f"controllerrrrr{self.controller}")
+        print(f"  InfluxDB URL: {INFLUX_URL}")
+        print(f"  InfluxDB ORG: {INFLUX_ORG}")
         reader = InfluxReader()
         try:
-            bots = BOTS
-            results = []
-            for bot in bots:
-                val = reader.latest_wh(bot, lookback="-30m")
-                results.append({"bot": bot, "wh": val})
-            print("InfluxDB 조회 결과:", results)
+            # 동적으로 BOT 목록 조회 (하드코딩 제거!)
+            results = reader.get_all_bots_battery(lookback="-30m")
+            print(f"InfluxDB 조회 결과 ({len(results)}개 BOT):", results)
             
             # Controller를 통해 디바이스 업데이트 
             result = self.controller.update_devices_from_influx(results)

@@ -19,7 +19,8 @@ spec:
     spec:
       containers:
       - name: analysis-engine
-        image: ketidevit2/sdi-analysis-engine:v0.1.8
+        image: ketidevit2/sdi-analysis-engine:v0.2.0
+        imagePullPolicy: Never  # 로컬 이미지 사용
         # 이미지의 엔트리포인트가 main.py라면 args만 있으면 됩니다.
         args: ["--both", "--grpc-port", "50051", "--rest-port", "5000"]
 
@@ -34,8 +35,35 @@ spec:
         env:
         - name: PYTHONUNBUFFERED
           value: "1"
-        - name: BOT
-          value: "TURTLEBOT3-Burger-1"
+        # InfluxDB 설정 - ConfigMap에서 주입
+        - name: INFLUX_URL
+          valueFrom:
+            configMapKeyRef:
+              name: influxdb-config
+              key: INFLUX_URL
+        - name: INFLUX_ORG
+          valueFrom:
+            configMapKeyRef:
+              name: influxdb-config
+              key: INFLUX_ORG
+        - name: INFLUX_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: influxdb-config
+              key: INFLUX_BUCKET
+        # InfluxDB Token - Secret에서 주입
+        - name: INFLUX_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-token
+              key: INFLUX_TOKEN
+        # 기본 BOT 목록 (동적 조회 실패 시 폴백용)
+        - name: DEFAULT_BOTS
+          valueFrom:
+            configMapKeyRef:
+              name: influxdb-config
+              key: DEFAULT_BOTS
+              optional: true
 
         resources:
           requests:
@@ -106,9 +134,20 @@ metadata:
   name: influxdb-config
   namespace: default
 data:
+  # InfluxDB 연결 설정
+  # Central Cluster 내부: influxdb.tbot-monitoring.svc.cluster.local:8086
+  # 외부 NodePort 접근: http://<NODE_IP>:32086
+  INFLUX_URL: "http://influxdb.tbot-monitoring.svc.cluster.local:8086"
+  INFLUX_ORG: "keti"
+  INFLUX_BUCKET: "turtlebot"
+
+  # 기본 BOT 목록 (동적 조회 실패 시 폴백용, 쉼표로 구분)
+  DEFAULT_BOTS: "TURTLEBOT3-Burger-1,TURTLEBOT3-Burger-2"
+
+  # 레거시 호환용 파일 (deprecated - 환경변수 사용 권장)
   influxdDB-Information.txt: |
-    # InfluxDB Configuration
-    # URL: http://10.0.5.52:32086
+    # InfluxDB Configuration (deprecated - use env vars)
+    # URL: http://influxdb.tbot-monitoring.svc.cluster.local:8086
     # ORG: keti
     # BUCKET: turtlebot
 ---
@@ -118,5 +157,8 @@ metadata:
   name: influxdb-token
   namespace: default
 type: Opaque
-data:
-  influxDB-TOKEN.txt: Zlpha1ZPX2dxZGI5UmswempPUkh3OTNqRENvd0p2QXFYM09lLXdNN0VlaV8tOTV5M2FOaTBaYTgzZVA1ZWhweUMxQkJVYTVGOVhoak9jcjczY19jaHc9PQ==
+stringData:
+  # InfluxDB 인증 토큰 (Metric-Collector의 influxdb-creds와 동일)
+  INFLUX_TOKEN: "my-super-secret-token"
+  # 레거시 호환용 파일 (deprecated)
+  influxDB-TOKEN.txt: "my-super-secret-token"
