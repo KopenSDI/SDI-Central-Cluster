@@ -10,21 +10,125 @@ import os
 import grpc
 from concurrent import futures
 
-# gRPC를 위한 임포트 - 실제 프로젝트의 경로에 맞게 수정해야 할 수 있습니다.
-# 예: from Protos import analysis_pb2, analysis_pb2_grpc
-# 이 부분은 현재 파일 구조를 알 수 없어 일반적인 형태로 작성했습니다.
-# 만약 gRPC 서비스 클래스가 다른 곳에 있다면 해당 클래스를 임포트해야 합니다.
+# gRPC proto 파일 임포트
+import analysis_service_pb2 as pb2
+import analysis_service_pb2_grpc as pb2_grpc
 
-# gRPC 서비스 구현체 (Servicer) - 실제 비즈니스 로직을 연결하는 부분
-# 이 클래스는 이미 프로젝트 내 다른 곳에 존재할 수 있습니다.
-class AnalysisServicer: # (analysis_pb2_grpc.AnalysisServiceServicer):
+
+# gRPC 서비스 구현체 (Servicer) - Controller와 연동하여 요청 처리
+class AnalysisServicer(pb2_grpc.AnalysisServiceServicer):
+    """gRPC 서비스 구현 - 실제 비즈니스 로직을 Controller에 위임"""
+
     def __init__(self, controller):
         self.controller = controller
-    
-    # 여기에 gRPC 요청을 처리하는 실제 메서드들을 구현합니다.
-    # 예: def AnalyzeDevice(self, request, context):
-    #        ...
-    #        return analysis_pb2.AnalysisResponse(...)
+        logging.info("gRPC AnalysisServicer 초기화 완료")
+
+    def CreateTurtlebot(self, request, context):
+        """터틀봇 생성"""
+        result = self.controller.create_device(
+            device_id=request.device_id,
+            model=request.model,
+            location=request.location
+        )
+        return pb2.CreateTurtlebotResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            device_id=result.get('device_id', '')
+        )
+
+    def GetDeviceStatus(self, request, context):
+        """디바이스 상태 조회"""
+        result = self.controller.get_device_status(request.device_id)
+        return pb2.GetDeviceStatusResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            device_id=result.get('device_id', ''),
+            status=result.get('status', 'unknown'),
+            battery_level=float(result.get('battery_level', 0.0)),
+            battery_wh=float(result.get('battery_wh', 0.0)),
+            location=result.get('location', '')
+        )
+
+    def GetAllDevices(self, request, context):
+        """모든 디바이스 조회"""
+        result = self.controller.get_all_devices()
+        devices = []
+        for d in result.get('devices', []):
+            devices.append(pb2.DeviceInfo(
+                device_id=d.get('device_id', ''),
+                device_type=d.get('device_type', ''),
+                status=d.get('status', ''),
+                battery_level=float(d.get('battery_level', 0.0))
+            ))
+        return pb2.GetAllDevicesResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            devices=devices
+        )
+
+    def GetBatteryStatus(self, request, context):
+        """배터리 상태 조회"""
+        result = self.controller.get_device_battery_status(request.device_id)
+        return pb2.GetBatteryStatusResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            device_id=result.get('device_id', ''),
+            battery_level=float(result.get('battery_level', 0.0)),
+            battery_wh=float(result.get('battery_wh', 0.0)),
+            estimated_runtime=float(result.get('estimated_runtime', 0.0)),
+            health_status=result.get('health_status', 'unknown')
+        )
+
+    def AnalyzeDevice(self, request, context):
+        """디바이스 분석"""
+        result = self.controller.analyze_device_performance(request.device_id)
+        return pb2.AnalyzeDeviceResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            device_id=result.get('device_id', ''),
+            performance_score=float(result.get('performance_score', 0.0)),
+            efficiency_rating=float(result.get('efficiency_rating', 0.0))
+        )
+
+    def GetDeviceScore(self, request, context):
+        """디바이스 점수 조회"""
+        result = self.controller.get_device_score(request.device_id)
+        return pb2.GetDeviceScoreResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            device_id=result.get('device_id', ''),
+            overall_score=float(result.get('overall_score', 0.0)),
+            accuracy_score=float(result.get('accuracy_score', 0.0)),
+            latency_score=float(result.get('latency_score', 0.0)),
+            grade=result.get('grade', 'F')
+        )
+
+    def GetFleetAnalysis(self, request, context):
+        """플릿 분석"""
+        result = self.controller.get_fleet_analysis()
+        return pb2.GetFleetAnalysisResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            total_devices=result.get('total_devices', 0),
+            active_devices=result.get('active_devices', 0),
+            average_performance=float(result.get('average_performance', 0.0))
+        )
+
+    def UpdateFromInflux(self, request, context):
+        """InfluxDB에서 데이터 업데이트"""
+        # InfluxReader를 사용하여 데이터 갱신
+        from influx_reader import InfluxReader
+        reader = InfluxReader()
+        try:
+            results = reader.get_all_bots_battery()
+            update_result = self.controller.update_devices_from_influx(results)
+            return pb2.UpdateFromInfluxResponse(
+                success=update_result.get('success', False),
+                message=update_result.get('message', ''),
+                updated_count=update_result.get('total_processed', 0)
+            )
+        finally:
+            reader.close()
 
 
 # ========================================================================================
@@ -41,20 +145,20 @@ class AnalysisView:
         """gRPC 서버를 생성하고 시작합니다."""
         try:
             self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
-            
-            # gRPC 서비스 구현체를 서버에 추가합니다.
-            # 아래 라인은 실제 프로젝트의 Servicer와 pb2_grpc 모듈에 맞게 수정해야 합니다.
-            # analysis_pb2_grpc.add_AnalysisServiceServicer_to_server(
-            #     AnalysisServicer(self.controller), self.grpc_server
-            # )
-            
+
+            # gRPC 서비스 구현체를 서버에 추가
+            pb2_grpc.add_AnalysisServiceServicer_to_server(
+                AnalysisServicer(self.controller), self.grpc_server
+            )
+            logging.info("gRPC AnalysisService 등록 완료")
+
             self.grpc_server.add_insecure_port(f'[::]:{port}')
             self.grpc_server.start()
             logging.info(f"gRPC 서버가 포트 {port}에서 시작되었습니다.")
             return self.grpc_server
         except Exception as e:
             logging.error(f"gRPC 서버 시작 실패: {e}")
-            raise  # 에러를 다시 발생시켜 main.py에서 처리하도록 함
+            raise
 
     def stop_grpc_server(self):
         """gRPC 서버를 안전하게 중지합니다."""
