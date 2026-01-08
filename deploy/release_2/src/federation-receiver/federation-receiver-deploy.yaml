@@ -1,0 +1,108 @@
+# Federation Receiver - Central Cluster에서 Edge Cluster 메트릭 수신
+# Edge Cluster의 metric-federation-agent가 30초마다 이 서비스로 메트릭을 전송
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: federation-receiver
+  namespace: keti-monitoring
+  labels:
+    app: federation-receiver
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: federation-receiver
+  template:
+    metadata:
+      labels:
+        app: federation-receiver
+        component: monitoring
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+      - name: federation-receiver
+        image: ketidevit2/federation-receiver:v2.2.0
+        imagePullPolicy: Never  # Kind 클러스터에서 로컬 이미지 사용
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        # InfluxDB 연결 설정
+        - name: INFLUX_URL
+          value: "http://influxdb.keti-monitoring.svc.cluster.local:8086"
+        - name: INFLUX_ORG
+          value: "keti"
+        - name: INFLUX_BUCKET
+          value: "federation"
+        - name: INFLUX_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: influxdb-creds
+              key: token
+        # 서버 설정
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "8080"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: federation-receiver
+  namespace: keti-monitoring
+  labels:
+    app: federation-receiver
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30080  # Edge Cluster에서 접근할 포트
+    protocol: TCP
+  selector:
+    app: federation-receiver
+---
+# ClusterIP 서비스 (내부 통신용)
+apiVersion: v1
+kind: Service
+metadata:
+  name: federation-receiver-internal
+  namespace: keti-monitoring
+  labels:
+    app: federation-receiver
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: federation-receiver
