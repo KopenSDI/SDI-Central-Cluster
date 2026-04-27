@@ -1,0 +1,88 @@
+# ==============================================================
+# SDI Scheduler - Algorithm 3: Predictive Context-Aware
+# ==============================================================
+#
+# 용도: IoT 엣지, 배터리 기기, 에너지 제약 환경
+#       (터틀봇, 드론, 모바일 엣지 노드)
+#
+# 알고리즘 원리: 시계열 예측 + 현재/미래 상태 기반 스케줄링
+#   - 클러스터 라벨에서 현재 상태 읽기 (CPU사용률, 배터리 등)
+#   - pred-* 라벨로 미래 상태 추정
+#   - 파워 예산 초과 시 스케줄링 거부
+#
+# 스코어 공식:
+#   S = (0.2×current + 0.35×predicted + 0.2×power
+#      + 0.15×stability + 0.1×battery) × confidence
+#
+# 알고리즘 파라미터 입력 경로:
+#   - 클러스터 라벨: cpu-usage, mem-usage, power-watt, battery-pct,
+#                    pred-cpu-usage, pred-mem-usage, cpu-trend, pred-confidence
+# ==============================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: predict-test-workload
+  namespace: sdi-test
+  labels:
+    app: predict-test-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: predict-test-workload
+  template:
+    metadata:
+      labels:
+        app: predict-test-workload
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: predict-test-policy
+  namespace: sdi-test
+spec:
+  schedulerName: sdi-scheduler
+
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: predict-test-workload
+
+  placement:
+    clusterAffinities:
+      - affinityName: predictive-context   # ← 알고리즘 선택
+
+# ==============================================================
+# 클러스터 라벨로 예측 데이터 주입 방법:
+#
+#   kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config \
+#     label cluster edge-cluster \
+#       sdi.keti.dev/cluster-type=edge \
+#       sdi.keti.dev/cpu-usage=0.65 \
+#       sdi.keti.dev/mem-usage=0.50 \
+#       sdi.keti.dev/power-watt=25 \
+#       sdi.keti.dev/pred-cpu-usage=0.70 \
+#       sdi.keti.dev/pred-mem-usage=0.55 \
+#       sdi.keti.dev/cpu-trend=stable \
+#       sdi.keti.dev/pred-confidence=0.85
+#
+# 배터리 기기인 경우:
+#   kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config \
+#     label cluster mobile-cluster \
+#       sdi.keti.dev/cluster-type=mobile \
+#       sdi.keti.dev/battery-pct=75
+# ==============================================================

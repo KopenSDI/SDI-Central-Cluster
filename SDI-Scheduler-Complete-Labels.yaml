@@ -1,0 +1,190 @@
+# ============================================================
+# SDI Scheduler - 완전한 레이블/필드 레퍼런스
+# ============================================================
+
+---
+# 1. Intent-Driven Algorithm
+# ============================================================
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: intent-driven-complete
+  namespace: ai-workloads
+spec:
+  schedulerName: sdi-scheduler
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: perception-module
+  placement:
+    clusterAffinities:
+      - affinityName: intent-driven
+        labelSelector:
+          matchLabels:
+            # 알고리즘 선택
+            sdi.keti.dev/scheduler-algorithm: "intent-driven"
+            
+            # ← Intent-Driven 파라미터
+            sdi.keti.dev/latency-budget-ms: "50"           # P95 예산
+            sdi.keti.dev/accuracy-target: "95"             # 목표 정확도
+            sdi.keti.dev/model-type: "yolov8"              # 모델 타입
+            sdi.keti.dev/compute-intensity: "150"          # 계산 강도 (TFLOPS)
+            sdi.keti.dev/latency-class: "ultra-low"        # 지연시간 클래스
+            
+            # 클러스터 요구조건
+            accelerator: "gpu"                             # GPU 필수
+            sdi.keti.dev/rtt-threshold: "50"               # RTT 임계값
+            gpu-model: "a100"                              # GPU 모델
+            gpu-memory-gb: "40"                            # GPU 메모리
+
+---
+# 2. Predictive Context Algorithm  
+# ============================================================
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: predictive-context-complete
+  namespace: iot-platform
+spec:
+  schedulerName: sdi-scheduler
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: sensor-collector
+  placement:
+    clusterAffinities:
+      - affinityName: predictive-context
+        labelSelector:
+          matchLabels:
+            # 알고리즘 선택
+            sdi.keti.dev/scheduler-algorithm: "predictive-context"
+            
+            # ← Predictive Context 파라미터
+            sdi.keti.dev/power-budget-watt: "30"           # 전력 예산 (W)
+            sdi.keti.dev/energy-class: "low"               # 에너지 클래스
+            sdi.keti.dev/runtime-window-sec: "600"         # 런타임 윈도우 (초)
+            sdi.keti.dev/battery-threshold: "30"           # 배터리 최소% 
+            sdi.keti.dev/cpu-threshold: "0.7"              # CPU 임계값
+            sdi.keti.dev/mem-threshold: "0.8"              # 메모리 임계값
+            sdi.keti.dev/power-threshold-watt: "350"       # 전력 최대값
+            
+            # ← 클러스터 레이블 (Metrics Agent가 업데이트)
+            est.power.watt: "200"                          # 예측 전력
+            est.cpu.usage: "0.65"                          # 예측 CPU 사용률
+            est.mem.usage: "0.75"                          # 예측 메모리 사용률
+            sdi.keti.dev/cluster-type: "edge"              # 클러스터 타입
+
+---
+# 3. Collaborative Swarm Algorithm
+# ============================================================
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: swarm-complete
+  namespace: microservices
+spec:
+  schedulerName: sdi-scheduler
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: ecommerce-platform
+  placement:
+    clusterAffinities:
+      - affinityName: collaborative-swarm
+        labelSelector:
+          matchLabels:
+            # 알고리즘 선택
+            sdi.keti.dev/scheduler-algorithm: "collaborative-swarm"
+            
+            # ← Collaborative Swarm 파라미터
+            sdi.keti.dev/region: "asia-northeast1"         # 목표 지역
+            sdi.keti.dev/energy-class: "medium"            # 에너지 클래스
+            sdi.keti.dev/collaboration-group: "ecommerce"  # 협력 그룹
+            sdi.keti.dev/affinity-weight: "0.4"            # 지역 친화성 가중치
+            sdi.keti.dev/load-balance-weight: "0.6"        # 로드밸런싱 가중치
+            
+            # ← 클러스터 레이블
+            topology.kubernetes.io/region: "asia-northeast1"  # 클러스터 지역
+            energy: "medium"                               # 에너지 클래스
+            sdi.keti.dev/collaboration-capable: "true"     # 협력 가능 여부
+
+---
+# 클러스터 레이블 설정 예시
+# ============================================================
+apiVersion: cluster.karmada.io/v1alpha1
+kind: Cluster
+metadata:
+  name: edge-cluster-asia
+  labels:
+    # === Kubernetes 표준 레이블 ===
+    topology.kubernetes.io/region: "asia-northeast1"
+    topology.kubernetes.io/zone: "asia-northeast1-a"
+    kubernetes.io/arch: "amd64"
+    kubernetes.io/os: "linux"
+    
+    # === Intent-Driven 레이블 ===
+    accelerator: "gpu"
+    gpu-model: "a100"
+    gpu-memory-gb: "40"
+    sdi.keti.dev/rtt-threshold: "50"
+    sdi.keti.dev/available-tflops: "200"
+    sdi.keti.dev/inference-capability: "high"
+    
+    # === Predictive Context 레이블 ===
+    est.power.watt: "200"
+    est.cpu.usage: "0.65"
+    est.mem.usage: "0.75"
+    sdi.keti.dev/cluster-type: "edge"
+    sdi.keti.dev/battery-capacity-mah: "50000"
+    
+    # === Collaborative Swarm 레이블 ===
+    energy: "medium"
+    sdi.keti.dev/collaboration-capable: "true"
+    sdi.keti.dev/load-balancer-type: "internal"
+    
+    # === 추가 정보 ===
+    hardware.karmada.io/gpu-count: "4"
+    hardware.karmada.io/gpu-type: "nvidia"
+    network.karmada.io/type: "gigabit"
+    capability: "inference,training"
+
+---
+# 환경 변수로 설정 (SDI-Scheduler Deployment에서)
+# ============================================================
+# env:
+#   # Accuracy/Latency/Energy 기본값
+#   - name: MALE_ACCURACY
+#     value: "95"
+#   - name: MALE_LATENCY
+#     value: "50"
+#   - name: MALE_ENERGY
+#     value: "30"
+#   
+#   # Service 타입
+#   - name: SERVICE_TYPE
+#     value: "yolov8"
+#   
+#   # 알고리즘 선택 (네임스페이스별)
+#   - name: SDI_ALGORITHM_AI_WORKLOADS
+#     value: "intent-driven"
+#   - name: SDI_ALGORITHM_IOT_PLATFORM
+#     value: "predictive-context"
+#   - name: SDI_ALGORITHM_MICROSERVICES
+#     value: "collaborative-swarm"
+#   
+#   # 기본 알고리즘
+#   - name: SDI_DEFAULT_ALGORITHM
+#     value: "intent-driven"
+
+---
+# Analysis Engine에서 제공하는 점수 (JSON)
+# ============================================================
+# {
+#   "accuracy": 95,          # 정확도 스코어
+#   "latency": 50,           # 지연시간 스코어 (ms)
+#   "energy": 30,            # 에너지 스코어
+#   "model_type": "yolov8",
+#   "compute_intensity": 150
+# }

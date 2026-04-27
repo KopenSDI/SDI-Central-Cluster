@@ -1,0 +1,82 @@
+# ==============================================================
+# SDI Scheduler - Algorithm 2: Collaborative-Swarm
+# ==============================================================
+#
+# 용도: 멀티 클러스터 로드밸런싱, 지역 친화성이 중요한 워크로드
+#       (마이크로서비스, 협업 로봇 군집 제어)
+#
+# 알고리즘 원리: PSO(Particle Swarm Optimization) 기반
+#   - 각 클러스터를 입자(Particle)로 표현
+#   - 부하(Load) + 지역 친화성(Affinity) + 에너지 + 용량으로 적합도 계산
+#   - 전체 클러스터 중 최적 입자(클러스터) 선택
+#
+# 스코어 공식:
+#   fitness = wLoad×(1-|load-0.3|) + wAffinity×affinityScore
+#           + 0.2×energyScore + 0.1×√capacity
+#
+# 알고리즘 파라미터 입력 경로:
+#   - 클러스터 라벨: sdi.keti.dev/region, energy-class, cpu-usage ...
+#   - topology.kubernetes.io/region 라벨로 지역 친화성 계산
+# ==============================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swarm-test-workload
+  namespace: sdi-test
+  labels:
+    app: swarm-test-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swarm-test-workload
+  template:
+    metadata:
+      labels:
+        app: swarm-test-workload
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: swarm-test-policy
+  namespace: sdi-test
+spec:
+  schedulerName: sdi-scheduler
+
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: swarm-test-workload
+
+  placement:
+    clusterAffinities:
+      - affinityName: collaborative-swarm   # ← 알고리즘 선택
+
+# ==============================================================
+# 클러스터 라벨로 알고리즘 입력값 주입 방법:
+#
+#   kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config \
+#     label cluster edge-cluster \
+#       sdi.keti.dev/region=asia-northeast1 \
+#       sdi.keti.dev/energy-class=low \
+#       sdi.keti.dev/cpu-usage=0.35 \
+#       topology.kubernetes.io/region=asia-northeast1
+#
+# 협업 그룹 지정 (같은 그룹 클러스터에 보너스):
+#   kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config \
+#     label cluster edge-cluster sdi.keti.dev/collaboration-group=robot-fleet-1
+# ==============================================================

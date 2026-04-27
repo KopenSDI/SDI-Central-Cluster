@@ -114,4 +114,3 @@ func (r *WebhookOverrideRequest) ToOverrideValue() *OverrideValue {
 		Energy:   r.Energy,
 	}
 }
-

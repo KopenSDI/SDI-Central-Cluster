@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"iot-sensor","male.keti.dev/managed":"true"},"name":"iot-sensor","namespace":"male-test"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"iot-sensor"}},"template":{"metadata":{"labels":{"app":"iot-sensor"}},"spec":{"containers":[{"image":"nginx:alpine","name":"collector","resources":{"requests":{"cpu":"50m","memory":"64Mi"}}}]}}}}
+  creationTimestamp: "2026-01-23T09:33:04Z"
+  generation: 2
+  labels:
+    app: iot-sensor
+    male.keti.dev/managed: "true"
+  name: iot-sensor
+  namespace: male-test
+  resourceVersion: "9205283"
+  uid: 74897421-01b2-4af2-8ca3-b4328058be1c
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: iot-sensor
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        male.keti.dev/priority-class: male-medium
+        male.keti.dev/score-source: operator
+      labels:
+        app: iot-sensor
+        male.keti.dev/mission: iot-sensor-data-collection
+        male.keti.dev/workload: male-test.iot-sensor
+    spec:
+      containers:
+      - image: nginx:alpine
+        imagePullPolicy: IfNotPresent
+        name: collector
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-01-23T09:33:06Z"
+    lastUpdateTime: "2026-01-23T09:33:06Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-01-23T09:33:04Z"
+    lastUpdateTime: "2026-01-23T09:33:06Z"
+    message: ReplicaSet "iot-sensor-789dd77b66" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

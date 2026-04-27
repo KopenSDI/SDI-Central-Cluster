@@ -1,0 +1,15 @@
+# ns-policy.yaml
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: sdi-demo-ns-policy
+  namespace: sdi-demo
+spec:
+  resourceSelectors:
+    - apiVersion: v1
+      kind: Namespace
+      name: sdi-demo
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - edge-cluster

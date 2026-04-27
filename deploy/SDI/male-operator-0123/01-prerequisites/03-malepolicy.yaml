@@ -1,0 +1,52 @@
+# MalePolicy - 클러스터 전체 MALE 평가 정책
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MalePolicy
+metadata:
+  name: default-male-policy
+spec:
+  # ALE 가중치 (합계 = 1.0)
+  # MixedScore = wA*A + wL*L + wE*E
+  weights:
+    accuracy: 0.4
+    latency: 0.4
+    energy: 0.2
+
+  # 값 범위 제한
+  bounds:
+    accuracy:
+      min: 0.0
+      max: 1.0
+    latency:
+      min: 0.0
+      max: 1.0
+    energy:
+      min: 0.0
+      max: 1.0
+
+  # 우선순위 버킷 (MixedScore 기반)
+  priorityBuckets:
+    - name: male-critical
+      min: 0.8
+      max: 1.0
+      priorityValue: 1000000
+    - name: male-high
+      min: 0.5
+      max: 0.8
+      priorityValue: 100000
+    - name: male-medium
+      min: 0.2
+      max: 0.5
+      priorityValue: 10000
+    - name: male-low
+      min: 0.0
+      max: 0.2
+      priorityValue: 1000
+
+  # Override 설정 (비활성화)
+  override:
+    enabled: false
+    source:
+      type: ConfigMap
+      namespace: male-system
+      name: male-policy-overrides

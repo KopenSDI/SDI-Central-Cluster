@@ -1,28 +1,60 @@
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: male-operator-manager-role
+  name: manager-role
 rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - male.keti.dev
   resources:
   - malepolicies
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - male.keti.dev
-  resources:
-  - malepolicies/status
-  verbs:
-  - get
-  - update
-  - patch
 - apiGroups:
   - male.keti.dev
   resources:
@@ -32,23 +64,23 @@ rules:
 - apiGroups:
   - male.keti.dev
   resources:
-  - maleworkloads
+  - malepolicies/status
   verbs:
   - get
-  - list
-  - watch
-  - create
-  - update
   - patch
-  - delete
+  - update
 - apiGroups:
   - male.keti.dev
   resources:
-  - maleworkloads/status
+  - maleworkloads
   verbs:
+  - create
+  - delete
   - get
-  - update
+  - list
   - patch
+  - update
+  - watch
 - apiGroups:
   - male.keti.dev
   resources:
@@ -56,59 +88,22 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - male.keti.dev
+  resources:
+  - maleworkloads/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - scheduling.k8s.io
   resources:
   - priorityclasses
   verbs:
-  - get
-  - list
-  - watch
   - create
-  - update
-  - patch
   - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - statefulsets
-  verbs:
   - get
   - list
-  - watch
-  - update
   - patch
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
   - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - configmaps
-  verbs:
-  - get
-  - list
   - watch
-  - update
-  - patch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-

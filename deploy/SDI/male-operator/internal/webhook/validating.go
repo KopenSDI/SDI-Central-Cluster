@@ -97,4 +97,3 @@ func (v *MaleWorkloadValidator) Handle(ctx context.Context, req admission.Reques
 
 	return admission.Allowed("")
 }
-

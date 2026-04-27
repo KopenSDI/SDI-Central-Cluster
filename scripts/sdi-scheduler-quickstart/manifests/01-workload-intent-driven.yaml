@@ -1,0 +1,79 @@
+# ==============================================================
+# SDI Scheduler - Algorithm 1: Intent-Driven
+# ==============================================================
+#
+# 용도: 지연시간/정확도/에너지 QoS가 중요한 AI 추론 워크로드
+#       (자율주행, 실시간 영상 처리, 로봇 제어)
+#
+# 알고리즘 선택: PropagationPolicy.spec.placement.clusterAffinities[].affinityName
+#
+# 스코어 공식: S = (wL×latencyScore + wA×accuracyScore + wE×energyScore) / totalW × 1000
+# 기본 가중치: Latency=0.4, Accuracy=0.4, Energy=0.2
+#
+# 알고리즘 파라미터 입력 경로:
+#   - 클러스터 라벨: sdi.keti.dev/cluster-type, energy-class, cpu-usage, mem-usage ...
+#   - ConfigMap 기본값: MALE_LATENCY, MALE_ACCURACY, MALE_ENERGY (sdi-scheduler-env)
+# ==============================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intent-test-workload
+  namespace: sdi-test
+  labels:
+    app: intent-test-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: intent-test-workload
+  template:
+    metadata:
+      labels:
+        app: intent-test-workload
+    spec:
+      containers:
+        - name: app
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: intent-test-policy
+  namespace: sdi-test
+spec:
+  schedulerName: sdi-scheduler    # SDI 스케줄러 사용 (필수)
+
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: intent-test-workload
+
+  placement:
+    clusterAffinities:
+      - affinityName: intent-driven   # ← 이 한 줄이 알고리즘을 선택함
+
+# ==============================================================
+# 클러스터 라벨로 알고리즘 입력값 주입 방법:
+#
+#   kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config \
+#     label cluster edge-cluster \
+#       sdi.keti.dev/cluster-type=edge \
+#       sdi.keti.dev/energy-class=low \
+#       sdi.keti.dev/cpu-usage=0.35 \
+#       sdi.keti.dev/mem-usage=0.40 \
+#       sdi.keti.dev/power-watt=45
+#
+# ConfigMap 기본값 변경:
+#   kubectl edit configmap sdi-scheduler-env -n karmada-system
+#   (MALE_LATENCY, MALE_ACCURACY, MALE_ENERGY 항목)
+# ==============================================================

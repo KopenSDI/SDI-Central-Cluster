@@ -1,0 +1,7 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: real-time
+value: 1000000
+globalDefault: false
+description: "SDI 프로젝트를 위한 실시간 작업용 우선순위 클래스"
