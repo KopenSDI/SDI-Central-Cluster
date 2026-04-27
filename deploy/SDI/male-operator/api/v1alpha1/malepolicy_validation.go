@@ -62,4 +62,3 @@ func (p *MalePolicy) ValidatePriorityBuckets() error {
 
 	return nil
 }
-

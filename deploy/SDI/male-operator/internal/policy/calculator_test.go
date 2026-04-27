@@ -24,11 +24,11 @@ import (
 
 func TestCalculateMixedScore(t *testing.T) {
 	tests := []struct {
-		name      string
-		weights   malev1alpha1.Weights
+		name       string
+		weights    malev1alpha1.Weights
 		importance malev1alpha1.ImportanceValues
-		wantScore float64
-		wantErr   bool
+		wantScore  float64
+		wantErr    bool
 	}{
 		{
 			name: "valid calculation",
@@ -83,8 +83,8 @@ func TestClampValues(t *testing.T) {
 	}
 
 	importance := malev1alpha1.ImportanceValues{
-		Accuracy: 1.5, // Should be clamped to 1.0
-		Latency:  0.5, // Should remain 0.5
+		Accuracy: 1.5,  // Should be clamped to 1.0
+		Latency:  0.5,  // Should remain 0.5
 		Energy:   0.05, // Should be clamped to 0.1
 	}
 
@@ -110,10 +110,10 @@ func TestFindPriorityBucket(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		score     float64
-		wantName  string
-		wantErr   bool
+		name     string
+		score    float64
+		wantName string
+		wantErr  bool
 	}{
 		{"low score", 0.15, "low", false},
 		{"medium score", 0.45, "medium", false},
@@ -199,4 +199,3 @@ func TestValidatePriorityBuckets(t *testing.T) {
 		})
 	}
 }
-

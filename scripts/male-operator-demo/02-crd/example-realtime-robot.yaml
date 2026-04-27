@@ -1,0 +1,73 @@
+# MALE Paper Case 2: Real-Time Robotics (실시간 로봇)
+#
+# ALE Values: A=0.1, L=0.7, E=0.2
+# Expected: Criticality A → B (Mission-Critical)
+# Reason: Latency-critical mission (L >= 0.7)
+#
+# 실시간 로봇은 즉각적인 응답이 가장 중요하며
+# 정확도는 상대적으로 낮아도 됨 → Mission-Critical
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime-robot-controller
+  namespace: default
+  labels:
+    app: robot-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: robot-controller
+  template:
+    metadata:
+      labels:
+        app: robot-controller
+    spec:
+      containers:
+      - name: controller
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: realtime-robot
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: realtime-robot-controller
+
+  mission: "realtime-robot-control"
+
+  # MALE Paper Case 2: Real-Time Robotics
+  importance:
+    accuracy: 0.1    # 낮은 정확도 (기본 동작)
+    latency: 0.7     # 높은 지연시간 (즉시 응답 필수)
+    energy: 0.2      # 낮은 에너지
+
+  # 사용자가 A로 지정했지만, ALE 분석 후 B로 재정의됨
+  mcSpec:
+    criticality: "A"
+    rtPeriod: 50      # 더 짧은 주기 (빠른 응답)
+    rtWcet: 15
+    rtDeadline: 50
+    missionId: "robot-mission-1"
+
+  allowPolicyOverride: true
+
+  schedulingHints:
+    addLabels:
+      workload-type: "realtime-robot"
+    addAnnotations:
+      description: "Real-time robot controller workload"

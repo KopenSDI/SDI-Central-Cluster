@@ -98,4 +98,3 @@ func (h *OverrideHandler) StartCleanup(interval time.Duration, logger logr.Logge
 		}
 	}()
 }
-

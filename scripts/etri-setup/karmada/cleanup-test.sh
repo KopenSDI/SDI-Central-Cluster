@@ -1,42 +1,28 @@
 #!/bin/bash
-# Karmada 테스트 리소스 정리 스크립트
+# ============================================================
+# 테스트 리소스 정리 스크립트
+# ============================================================
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/config.sh"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NAMESPACE="${1:-${DEFAULT_NAMESPACE}}"
 
-KARMADA_KUBECONFIG="/etc/karmada/karmada-apiserver.config"
-TEST_NAMESPACE="karmada-test"
-
-echo "======================================"
-echo "Karmada 테스트 리소스 정리"
-echo "======================================"
+echo "테스트 리소스 정리 중..."
+echo "  - Namespace: ${NAMESPACE}"
 echo ""
 
-if [ ! -f "${KARMADA_KUBECONFIG}" ]; then
-    echo -e "${RED}✗ Karmada가 설치되지 않았습니다.${NC}"
-    exit 1
-fi
+# Central 클러스터에서 삭제
+echo "[1/3] Central 클러스터 정리..."
+kubectl delete ns "${NAMESPACE}" 2>/dev/null && echo "  ✓ Central namespace 삭제" || echo "  - Central namespace 없음"
 
-echo -e "${YELLOW}테스트 네임스페이스 '${TEST_NAMESPACE}' 삭제 중...${NC}"
+# Karmada에서 삭제
+echo "[2/3] Karmada 정리..."
+kubectl --kubeconfig="${KARMADA_KUBECONFIG}" delete ns "${NAMESPACE}" 2>/dev/null && echo "  ✓ Karmada namespace 삭제" || echo "  - Karmada namespace 없음"
 
-# PropagationPolicy 삭제
-kubectl --kubeconfig="${KARMADA_KUBECONFIG}" delete propagationpolicy nginx-propagation -n ${TEST_NAMESPACE} 2>/dev/null || true
-
-# Deployment 삭제
-kubectl --kubeconfig="${KARMADA_KUBECONFIG}" delete deployment nginx-test -n ${TEST_NAMESPACE} 2>/dev/null || true
-
-# 네임스페이스 삭제
-kubectl --kubeconfig="${KARMADA_KUBECONFIG}" delete namespace ${TEST_NAMESPACE} 2>/dev/null || true
+# Edge 클러스터에서 삭제
+echo "[3/3] Edge 클러스터 정리..."
+ssh_edge "kubectl delete ns ${NAMESPACE} --force --grace-period=0 2>/dev/null" 2>/dev/null && echo "  ✓ Edge namespace 삭제" || echo "  - Edge namespace 없음 또는 접근 불가"
 
 echo ""
-echo -e "${GREEN}✓ 테스트 리소스 정리 완료${NC}"
-echo ""
-echo "확인:"
-echo "  kubectl --kubeconfig=/etc/karmada/karmada-apiserver.config get ns ${TEST_NAMESPACE}"
-
-
-
+echo "정리 완료!"

@@ -206,4 +206,3 @@ type MalePolicyList struct {
 func init() {
 	SchemeBuilder.Register(&MalePolicy{}, &MalePolicyList{})
 }
-

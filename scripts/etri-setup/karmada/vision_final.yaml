@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    description: Embedded system vision task
+    male.sdi.dev/accuracy: "0.98"
+    male.sdi.dev/energy: "0.5"
+    male.sdi.dev/latency: "0.3"
+    male.sdi.dev/mission: keti-robotics-final
+    propagationpolicy.karmada.io/name: sdi-vision-propagation
+    propagationpolicy.karmada.io/namespace: sdi-demo
+  creationTimestamp: "2026-03-13T01:09:55Z"
+  labels:
+    managed_by: ansible
+    mission: keti-robotics-final
+    project: SDI-Bridge
+    propagationpolicy.karmada.io/permanent-id: 14e8421a-6dd8-4e17-a3db-d414a6c207b2
+  name: keti-robotics-final-vision-processor
+  namespace: sdi-demo
+  resourceVersion: "19638108"
+  uid: 17c5c022-7ae1-4d71-b739-0a774e764431
+spec:
+  containers:
+  - image: yolov8-custom:v1.0
+    imagePullPolicy: IfNotPresent
+    name: vision-processor
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  preemptionPolicy: PreemptLowerPriority
+  priority: 1000000
+  priorityClassName: real-time
+  restartPolicy: Always
+  schedulerName: sdi-scheduler
+  securityContext: {}
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+status:
+  phase: Pending
+  qosClass: BestEffort

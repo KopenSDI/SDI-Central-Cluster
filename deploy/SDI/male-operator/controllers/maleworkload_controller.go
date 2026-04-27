@@ -40,9 +40,9 @@ import (
 // MaleWorkloadReconciler reconciles a MaleWorkload object
 type MaleWorkloadReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	ConfigMapReader   *override.ConfigMapReader
-	WebhookCache      *override.WebhookOverrideCache
+	Scheme          *runtime.Scheme
+	ConfigMapReader *override.ConfigMapReader
+	WebhookCache    *override.WebhookOverrideCache
 }
 
 //+kubebuilder:rbac:groups=male.keti.dev,resources=maleworkloads,verbs=get;list;watch;create;update;patch;delete
@@ -119,6 +119,33 @@ func (r *MaleWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	// ============================================================
+	// MC Criticality Determination (MALE Paper-based)
+	// ============================================================
+	// Determine criticality based on ALE importance values
+	// This implements the MALE paper's mission-driven evaluation method
+	var userCriticality string
+	if workload.Spec.MCSpec != nil {
+		userCriticality = workload.Spec.MCSpec.Criticality
+	}
+
+	criticalityResult := policy.DetermineCriticality(
+		effectiveImportance,
+		userCriticality,
+		workload.Spec.AllowPolicyOverride,
+	)
+
+	// Build effective MC spec
+	effectiveMCSpec := r.buildEffectiveMCSpec(workload, criticalityResult)
+
+	if criticalityResult.WasOverridden {
+		logger.Info("MC Criticality overridden by MALE evaluation",
+			"original", criticalityResult.OriginalCriticality,
+			"effective", criticalityResult.Criticality,
+			"missionType", criticalityResult.MissionType,
+			"reason", criticalityResult.Reason)
+	}
+
 	// Update target workload with labels/annotations
 	if err := r.updateTargetWorkload(ctx, workload, bucket.Name); err != nil {
 		logger.Error(err, "Failed to update target workload")
@@ -129,6 +156,7 @@ func (r *MaleWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Update status
 	now := metav1.Now()
 	workload.Status.EffectiveImportance = &effectiveImportance
+	workload.Status.EffectiveMCSpec = effectiveMCSpec
 	workload.Status.MixedScore = &mixedScore
 	workload.Status.PriorityClassName = bucket.Name
 	workload.Status.LastEvaluationTime = &now
@@ -139,7 +167,9 @@ func (r *MaleWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	r.updateCondition(ctx, workload, "Ready", "Evaluated",
-		fmt.Sprintf("Score: %.3f, PriorityClass: %s", mixedScore, bucket.Name), metav1.ConditionTrue)
+		fmt.Sprintf("Score: %.3f, PriorityClass: %s, Criticality: %s (%s)",
+			mixedScore, bucket.Name, criticalityResult.Criticality, criticalityResult.MissionType),
+		metav1.ConditionTrue)
 
 	return ctrl.Result{}, nil
 }
@@ -311,6 +341,55 @@ func (r *MaleWorkloadReconciler) updateCondition(ctx context.Context, workload *
 	}
 }
 
+// buildEffectiveMCSpec constructs the effective MC spec from user input and criticality result
+func (r *MaleWorkloadReconciler) buildEffectiveMCSpec(
+	workload *malev1alpha1.MaleWorkload,
+	criticalityResult policy.CriticalityResult,
+) *malev1alpha1.EffectiveMCSpec {
+	effectiveMCSpec := &malev1alpha1.EffectiveMCSpec{
+		Criticality: string(criticalityResult.Criticality),
+		MissionType: string(criticalityResult.MissionType),
+	}
+
+	// Copy user-specified MC parameters if available
+	if workload.Spec.MCSpec != nil {
+		mcSpec := workload.Spec.MCSpec
+
+		// Use user-specified values or defaults
+		if mcSpec.RTPeriod > 0 {
+			effectiveMCSpec.RTPeriod = mcSpec.RTPeriod
+		} else {
+			effectiveMCSpec.RTPeriod = 100 // Default: 100ms
+		}
+
+		if mcSpec.RTWcet > 0 {
+			effectiveMCSpec.RTWcet = mcSpec.RTWcet
+		} else {
+			effectiveMCSpec.RTWcet = 30 // Default: 30ms
+		}
+
+		if mcSpec.RTDeadline > 0 {
+			effectiveMCSpec.RTDeadline = mcSpec.RTDeadline
+		} else {
+			effectiveMCSpec.RTDeadline = effectiveMCSpec.RTPeriod // Default: same as period
+		}
+
+		effectiveMCSpec.MissionId = mcSpec.MissionId
+	} else {
+		// Use defaults
+		effectiveMCSpec.RTPeriod = 100
+		effectiveMCSpec.RTWcet = 30
+		effectiveMCSpec.RTDeadline = 100
+	}
+
+	// Set override reason if criticality was changed
+	if criticalityResult.WasOverridden {
+		effectiveMCSpec.OverrideReason = criticalityResult.Reason
+	}
+
+	return effectiveMCSpec
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *MaleWorkloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -320,4 +399,3 @@ func (r *MaleWorkloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&batchv1.Job{}).
 		Complete(r)
 }
-

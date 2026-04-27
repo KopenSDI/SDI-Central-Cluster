@@ -60,4 +60,3 @@ func (r *MaleWorkload) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		For(r).
 		Complete()
 }
-

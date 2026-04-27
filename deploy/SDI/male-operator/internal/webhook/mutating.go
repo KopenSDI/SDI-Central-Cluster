@@ -75,7 +75,7 @@ func (m *PodMutator) Handle(ctx context.Context, req admission.Request) admissio
 	// Try to get importance from Pod labels/annotations first (highest priority)
 	var effectiveImportance malev1alpha1.ImportanceValues
 	podImportance, hasPodImportance := m.getImportanceFromPod(pod)
-	
+
 	if hasPodImportance {
 		// Use Pod's direct importance values
 		effectiveImportance = *podImportance
@@ -173,6 +173,7 @@ func (m *PodMutator) shouldMutatePod(pod *corev1.Pod) (string, bool) {
 //   - male.keti.dev/accuracy
 //   - male.keti.dev/latency
 //   - male.keti.dev/energy
+//
 // Returns the importance values and true if all three values are found, false otherwise
 func (m *PodMutator) getImportanceFromPod(pod *corev1.Pod) (*malev1alpha1.ImportanceValues, bool) {
 	var accuracy, latency, energy float64
@@ -270,4 +271,3 @@ func (m *PodMutator) getMaleWorkload(ctx context.Context, namespace, workloadLab
 
 	return nil, nil
 }
-

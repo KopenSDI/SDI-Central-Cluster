@@ -1,80 +1,139 @@
-
-import copy
 import os
-from typing import Dict, Any
+from typing import Dict, Any, List
 from ruamel.yaml import YAML
+from io import StringIO
 
-# Initialize ruamel.yaml for round-trip loading and dumping
 yaml = YAML()
 yaml.indent(mapping=2, sequence=4, offset=2)
 
-# ConfigMap에서 마운트될 템플릿 파일의 경로
-POD_TEMPLATE_PATH = os.getenv("POD_TEMPLATE_PATH", "/etc/config/pod-template.yaml")
+def enrich_manifest(user_input: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Ansible 입력 -> [Deployment, MaleWorkload, PropagationPolicy] 세트 생성
+    """
+    mission         = user_input.get('mission', 'default')
+    container_name = user_input.get('container_name', 'app')
+    image          = user_input.get('image', '')
+    namespace      = user_input.get('namespace', 'sdi-demo')
+    name           = f"{mission}-{container_name}"
 
-def load_template() -> Dict[str, Any]:
-    """
-    파일 시스템에서 기본 Pod 템플릿을 로드합니다.
-    """
-    try:
-        with open(POD_TEMPLATE_PATH, 'r') as f:
-            return yaml.load(f)
-    except FileNotFoundError:
-        # 테스트 또는 로컬 실행을 위한 폴백(fallback) 템플릿
-        return {
-            'apiVersion': 'v1',
-            'kind': 'Pod',
-            'metadata': {'labels': {}, 'annotations': {}},
-            'spec': {
-                'schedulerName': 'sdi-scheduler',
-                'priorityClassName': 'real-time',
-                'nodeSelector': {'role': 'edge'},
-                'containers': [{'name': '', 'image': ''}]
+    # 앤시블에서 받은 float 값 그대로 사용 (0~1)
+    accuracy_val = float(user_input.get('accuracy', 0.5))
+    latency_val  = float(user_input.get('latency', 0.3))
+    energy_val   = float(user_input.get('energy', 0.2))
+    
+    criticality = user_input.get('criticality', 'A')
+
+    # 1. Deployment 생성 (순수 워크로드)
+    deployment = {
+        'apiVersion': 'apps/v1',
+        'kind': 'Deployment',
+        'metadata': {
+            'name': name,
+            'namespace': namespace,
+            'labels': {
+                'mission': mission,
+                'app': name,
+                'managed-by': 'sdi-manifest-bridge'
             }
+        },
+        'spec': {
+            'replicas': 1,
+            'selector': {
+                'matchLabels': {'app': name},
+            },
+            'template': {
+                'metadata': {
+                    'labels': {
+                        'app': name,
+                        'mission': mission,
+                    },
+                },
+                'spec': {
+                    # schedulerName: 'sdi-scheduler'를 제거하여 에지의 기본 스케줄러가 파드를 실행하게 함
+                    'containers': [{
+                        'name': container_name,
+                        'image': image,
+                        'resources': {
+                            'requests': {'cpu': '100m', 'memory': '128Mi'},
+                            'limits': {'cpu': '500m', 'memory': '256Mi'}
+                        }
+                    }],
+                },
+            },
+        },
+    }
+
+    # 2. MaleWorkload 생성 (의도 주입)
+    maleworkload = {
+        'apiVersion': 'male.keti.dev/v1alpha1',
+        'kind': 'MaleWorkload',
+        'metadata': {
+            'name': f"{name}-workload",
+            'namespace': namespace,
+        },
+        'spec': {
+            'targetRef': {
+                'apiVersion': 'apps/v1',
+                'kind': 'Deployment',
+                'name': name,
+            },
+            'mission': mission,
+            'importance': {
+                'accuracy': accuracy_val,
+                'latency':  latency_val,
+                'energy':   energy_val,
+            },
+            'mcSpec': {
+                'criticality': criticality,
+                'missionId': mission,
+                'rtPeriod': int(user_input.get('rt_period', 100)),
+                'rtWcet': int(user_input.get('rt_wcet', 30)),
+                'rtDeadline': int(user_input.get('rt_deadline', 100)),
+            },
+            'allowPolicyOverride': True
+        },
+    }
+
+    # 3. PropagationPolicy 생성 (배포 지시서)
+    propagationpolicy = {
+        'apiVersion': 'policy.karmada.io/v1alpha1',
+        'kind': 'PropagationPolicy',
+        'metadata': {
+            'name': f"{name}-policy",
+            'namespace': namespace,
+        },
+        'spec': {
+            'resourceSelectors': [
+                {
+                    'apiVersion': 'apps/v1',
+                    'kind': 'Deployment',
+                    'name': name
+                }
+            ],
+            'placement': {
+                'clusterAffinities': [
+                    {
+                        'affinityName': 'intent-driven' # 기본 알고리즘
+                    }
+                ]
+            },
+            'schedulerName': 'sdi-scheduler'
         }
+    }
 
-# 애플리케이션 시작 시 템플릿을 한 번 로드
-base_pod_template = load_template()
-
-def enrich_manifest(user_input: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    사용자 입력을 기반으로 로드된 템플릿을 보강합니다.
-    """
-    # 원본 템플릿을 수정하지 않도록 깊은 복사 사용
-    enriched_manifest = copy.deepcopy(base_pod_template)
-
-    # --- 보강 규칙 적용 ---
-    # 1. 메타데이터 생성 (이름)
-    enriched_manifest['metadata']['name'] = f"{user_input.get('mission', 'default')}-{user_input.get('container_name', 'pod')}"
-    enriched_manifest['metadata']['namespace'] = 'sdi-demo'
-
-    # 2. 기본 필드 매핑
-    enriched_manifest['spec']['containers'][0]['name'] = user_input.get('container_name')
-    enriched_manifest['spec']['containers'][0]['image'] = user_input.get('image')
-
-    # 3. 미션 레이블 및 어노테이션 처리
-    if 'mission' in user_input:
-        enriched_manifest['metadata']['labels']['mission'] = user_input['mission']
-        enriched_manifest['metadata']['annotations']['male.sdi.dev/mission'] = user_input['mission']
-
-    # 4. 사용자 정의 레이블 및 어노테이션 병합
+    # 사용자 정의 라벨/어노테이션이 있다면 Deployment에만 병합
     if user_input.get('labels'):
-        enriched_manifest['metadata']['labels'].update(user_input['labels'])
+        deployment['metadata']['labels'].update(user_input['labels'])
     if user_input.get('annotations'):
-        enriched_manifest['metadata']['annotations'].update(user_input['annotations'])
+        deployment['metadata']['annotations'] = user_input['annotations']
 
-    # 5. MALE 어노테이션 추가
-    for key in ['accuracy', 'latency', 'energy']:
-        if user_input.get(key) is not None:
-            enriched_manifest['metadata']['annotations'][f'male.sdi.dev/{key}'] = str(user_input[key])
+    return [deployment, maleworkload, propagationpolicy]
 
-    return enriched_manifest
-
-def to_yaml_string(data: Dict[str, Any]) -> str:
-    """
-    딕셔너리를 YAML 문자열로 변환합니다.
-    """
-    from io import StringIO
-    string_stream = StringIO()
-    yaml.dump(data, string_stream)
-    return string_stream.getvalue()
-
+def to_yaml_string(data: List[Dict[str, Any]] | Dict[str, Any]) -> str:
+    if not isinstance(data, list): data = [data]
+    documents = []
+    for doc in data:
+        stream = StringIO()
+        yaml.dump(doc, stream)
+        documents.append(stream.getvalue())
+    return "---\n".join(documents)

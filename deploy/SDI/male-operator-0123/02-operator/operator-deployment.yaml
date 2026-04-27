@@ -1,0 +1,109 @@
+# MALE-Operator Deployment
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: male-controller-manager
+  namespace: male-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: male-controller-manager-role
+rules:
+  # MaleWorkload CRD
+  - apiGroups: ["male.keti.dev"]
+    resources: ["maleworkloads"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["male.keti.dev"]
+    resources: ["maleworkloads/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["male.keti.dev"]
+    resources: ["maleworkloads/finalizers"]
+    verbs: ["update"]
+  # MalePolicy CRD
+  - apiGroups: ["male.keti.dev"]
+    resources: ["malepolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["male.keti.dev"]
+    resources: ["malepolicies/status"]
+    verbs: ["get", "update", "patch"]
+  # Workload resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: male-controller-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: male-controller-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: male-controller-manager
+    namespace: male-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: male-controller-manager
+  namespace: male-system
+  labels:
+    app: male-operator
+    control-plane: controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        app: male-operator
+    spec:
+      serviceAccountName: male-controller-manager
+      containers:
+        - name: manager
+          image: ketidevit2/male-operator:v2-mc
+          imagePullPolicy: Always
+          command:
+            - /manager
+          args:
+            - --leader-elect=false
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      terminationGracePeriodSeconds: 10
