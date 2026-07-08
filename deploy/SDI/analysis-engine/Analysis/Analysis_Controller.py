@@ -826,9 +826,12 @@ class AnalysisController:
                     'battery_level': getattr(device, 'fuel_level', 75.0),
                     'battery_wh': getattr(device, 'battery_wh', 400.0),
                     'status': getattr(device, 'status', 'online'),
-                    'device_type': getattr(device, 'device_type', 'turtlebot')
+                    'device_type': getattr(device, 'device_type', 'turtlebot'),
+                    # 실측 A/L 메트릭: 모델에 채워지면 자동 반영, 없으면 None → Manager가 fallback
+                    'accuracy_measured': getattr(device, 'accuracy_measured', None),
+                    'latency_ms': getattr(device, 'latency_ms', None),
                 }
-            
+
             # ALE 점수 계산
             result = self.ale_weight_manager.calculate_ale_scores_for_device(device_id, device_data)
             
@@ -882,7 +885,10 @@ class AnalysisController:
                         'battery_level': getattr(device, 'fuel_level', 75.0),
                         'battery_wh': getattr(device, 'battery_wh', 400.0),
                         'status': getattr(device, 'status', 'online'),
-                        'device_type': getattr(device, 'device_type', 'turtlebot')
+                        'device_type': getattr(device, 'device_type', 'turtlebot'),
+                        # 실측 A/L 메트릭: 모델에 채워지면 자동 반영, 없으면 None → Manager가 fallback
+                        'accuracy_measured': getattr(device, 'accuracy_measured', None),
+                        'latency_ms': getattr(device, 'latency_ms', None),
                     }
             
             # 다중 ALE 점수 계산

@@ -7,6 +7,10 @@ class ALEWeightManager:
     def __init__(self):
         self.ale_weights = {}
         self.logger = logging.getLogger(__name__)
+        # 실측 기반 점수화 파라미터 (데이터 파이프라인이 채워지기 전에는 fallback 사용)
+        self.DEFAULT_NEUTRAL_SCORE = 50.0   # 실측값이 없을 때 쓰는 중립 점수
+        self.LATENCY_REFERENCE_MS = 500.0   # 이 지연(ms) 이상이면 지연 점수 0으로 수렴
+        self.ENERGY_FULL_WH = 500.0         # 완충 기준 배터리 용량(wh)
         self._init_default_weights()
     # 가중치 초기화 -- 파이썬이라 안하면 생성이안됨
     def _init_default_weights(self):
@@ -368,76 +372,136 @@ class ALEWeightManager:
             }
     
     def _calculate_accuracy_score(self, device_id: str, device_data: Dict[str, Any] = None) -> float:
-        """정확도 점수 계산 (0-100)"""
+        """
+        정확도 점수 계산 (0-100).
+        실측 정확도(device_data['accuracy_measured'], 0-100)가 있으면 그대로 사용하고,
+        없으면 중립 기본값으로 폴백한다.
+        ⚠️ 기존 해시 기반 임시값은 제거됨 — 실측 파이프라인이 채워지면 자동으로 실값 반영.
+        """
         try:
-            # 기본 정확도 점수
-            base_score = 85.0
-            
-            # 디바이스별 변동 (해시 기반)
-            device_factor = (hash(device_id) % 20) - 10  # -10 ~ +10
-            
-            # 디바이스 상태 반영
-            if device_data:
-                battery_level = device_data.get('battery_level', 75.0)
-                if battery_level < 20:
-                    base_score -= 15  # 배터리 부족 시 정확도 하락
-                elif battery_level > 80:
-                    base_score += 5   # 배터리 충분 시 정확도 향상
-            
-            return max(0, min(100, base_score + device_factor))
-            
-        except Exception:
-            return 50.0  # 기본값
-    
+            if device_data and device_data.get('accuracy_measured') is not None:
+                return max(0.0, min(100.0, float(device_data['accuracy_measured'])))
+            # 실측 정확도 없음 → 가짜 다양성 대신 명시적 중립 폴백
+            return self.DEFAULT_NEUTRAL_SCORE
+        except (TypeError, ValueError):
+            return self.DEFAULT_NEUTRAL_SCORE
+
     def _calculate_latency_score(self, device_id: str, device_data: Dict[str, Any] = None) -> float:
-        """지연시간 점수 계산 (0-100, 낮은 지연시간 = 높은 점수)"""
+        """
+        지연시간 점수 계산 (0-100, 낮은 지연 = 높은 점수).
+        실측 지연(device_data['latency_ms'])을 기준값(LATENCY_REFERENCE_MS)에 대비해 환산한다.
+        offline 상태면 0, 실측값이 없으면 중립 기본값으로 폴백.
+        """
         try:
-            # 기본 지연시간 점수
-            base_score = 75.0
-            
-            # 디바이스별 변동
-            device_factor = (hash(device_id) % 30) - 15  # -15 ~ +15
-            
-            # 디바이스 상태 반영
-            if device_data:
-                status = device_data.get('status', 'online')
-                if status == 'offline':
-                    base_score = 0
-                elif status == 'busy':
-                    base_score -= 20
-                elif status == 'idle':
-                    base_score += 10
-            
-            return max(0, min(100, base_score + device_factor))
-            
-        except Exception:
-            return 50.0  # 기본값
-    
+            if device_data and device_data.get('status') == 'offline':
+                return 0.0
+            if device_data and device_data.get('latency_ms') is not None:
+                latency_ms = float(device_data['latency_ms'])
+                ref = self.LATENCY_REFERENCE_MS if self.LATENCY_REFERENCE_MS > 0 else 1.0
+                score = 100.0 - (latency_ms / ref) * 100.0
+                return max(0.0, min(100.0, score))
+            return self.DEFAULT_NEUTRAL_SCORE
+        except (TypeError, ValueError):
+            return self.DEFAULT_NEUTRAL_SCORE
+
     def _calculate_energy_score(self, device_id: str, device_data: Dict[str, Any] = None) -> float:
-        """에너지 점수 계산 (0-100, 높은 에너지 효율성 = 높은 점수)"""
+        """
+        에너지 점수 계산 (0-100, 높은 잔량/효율 = 높은 점수).
+        배터리는 이미 실측되므로 battery_wh(완충 ENERGY_FULL_WH 대비)로 환산한다.
+        battery_wh가 없으면 battery_level(%)을, 그것도 없으면 중립 기본값으로 폴백.
+        """
         try:
-            # 기본 에너지 점수
-            base_score = 70.0
-            
-            # 디바이스별 변동
-            device_factor = (hash(device_id) % 25) - 12  # -12 ~ +13
-            
-            # 배터리 상태 반영
-            if device_data:
-                battery_level = device_data.get('battery_level', 75.0)
-                battery_wh = device_data.get('battery_wh', 400.0)
-                
-                if battery_level > 90:
-                    base_score += 15
-                elif battery_level < 20:
-                    base_score -= 20
-                
-                if battery_wh > 450:
-                    base_score += 5
-                elif battery_wh < 300:
-                    base_score -= 10
-            
-            return max(0, min(100, base_score + device_factor))
-            
-        except Exception:
-            return 50.0  # 기본값
+            if device_data and device_data.get('battery_wh') is not None:
+                wh = float(device_data['battery_wh'])
+                full = self.ENERGY_FULL_WH if self.ENERGY_FULL_WH > 0 else 1.0
+                return max(0.0, min(100.0, (wh / full) * 100.0))
+            if device_data and device_data.get('battery_level') is not None:
+                return max(0.0, min(100.0, float(device_data['battery_level'])))
+            return self.DEFAULT_NEUTRAL_SCORE
+        except (TypeError, ValueError):
+            return self.DEFAULT_NEUTRAL_SCORE
+
+    # ========================================================================================
+    # 가중치 적용 최종 점수 계산 (외부에서 들어온 실측 A/L/E 값 → ALE 가중 점수)
+    #  - Controller/Model 이 위임 호출하지만 기존에 구현이 누락되어 있던 메서드.
+    #  - 해시 기반 임시 점수(_calculate_*_score)와 달리, 입력값으로만 정직하게 계산한다.
+    # ========================================================================================
+    def calculate_weighted_score(self, device_id: str, accuracy_value: float,
+                                 latency_value: float, energy_value: float) -> Dict[str, Any]:
+        """
+        실측 A/L/E 값(각 0-1000)에 디바이스별 가중치를 적용해
+        최종 가중 점수(0-100)와 등급을 계산한다.
+
+        Args:
+            device_id: 디바이스 ID
+            accuracy_value: 정확도 측정값 (0-1000, 높을수록 좋음)
+            latency_value: 지연시간 측정값 (0-1000, 낮을수록 좋음)
+            energy_value: 에너지 측정값 (0-1000, 높을수록 좋음)
+
+        Returns:
+            {'success': bool, 'message': str, 'result': WeightedScoreResult|None}
+        """
+        try:
+            # 1) 입력값 유효성 검사 (0-1000)
+            v = self._validate_metric_values(accuracy_value, latency_value, energy_value)
+            if not v['valid']:
+                return {'success': False, 'message': v['message'], 'result': None}
+
+            # 2) 0-1000 측정값 → 0-100 점수로 변환 (L은 낮을수록 높은 점수)
+            scores = self._convert_metrics_to_scores(accuracy_value, latency_value, energy_value)
+
+            # 3) 디바이스별 가중치 조회 (없으면 기본 가중치)
+            weight_resp = self.get_weight(device_id)
+            weights = weight_resp.get('weights') or self.ale_weights['default']
+            aw = weights['accuracy_weight']
+            lw = weights['latency_weight']
+            ew = weights['energy_weight']
+
+            # 4) 가중 합산 — 가중치 합이 1이 아니어도 정규화하여 0-100 범위 유지
+            weight_sum = aw + lw + ew
+            if weight_sum <= 0:
+                weight_sum = 1.0
+            weighted_score = (
+                scores['accuracy'] * aw +
+                scores['latency'] * lw +
+                scores['energy'] * ew
+            ) / weight_sum
+
+            result = {
+                'device_id': device_id,
+                'weights_used': weights,
+                'accuracy_score': round(scores['accuracy'], 2),
+                'latency_score': round(scores['latency'], 2),
+                'energy_score': round(scores['energy'], 2),
+                'weighted_score': round(weighted_score, 2),
+                'score_grade': self._score_to_grade(weighted_score),
+                'calculation_timestamp': datetime.now().isoformat()
+            }
+
+            self.logger.info(
+                f"가중 점수 계산: {device_id} -> {result['weighted_score']} ({result['score_grade']})"
+            )
+            return {
+                'success': True,
+                'message': f'{device_id} 가중 점수 계산 완료',
+                'result': result
+            }
+
+        except Exception as e:
+            self.logger.error(f"가중 점수 계산 실패 ({device_id}): {e}")
+            return {
+                'success': False,
+                'message': f'가중 점수 계산 실패: {str(e)}',
+                'result': None
+            }
+
+    def _score_to_grade(self, score: float) -> str:
+        """0-100 가중 점수를 등급 문자열로 변환"""
+        if score >= 95: return 'A+'
+        if score >= 90: return 'A'
+        if score >= 85: return 'B+'
+        if score >= 80: return 'B'
+        if score >= 75: return 'C+'
+        if score >= 70: return 'C'
+        if score >= 60: return 'D'
+        return 'F'
