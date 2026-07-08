@@ -137,6 +137,32 @@ class AnalysisView:
                 failed_devices=failed,
             )
 
+        @app.post("/api/weighted-score", response_model=WeightedScoreResponse)
+        def api_weighted_score(req: WeightedScoreRequest):
+            """
+            외부에서 들어온 실측 A/L/E 값(0-1000)에 디바이스별 가중치를 적용해
+            최종 가중 점수를 계산한다. (proto CalculateWeightedScore 의 REST 대응 엔드포인트)
+            """
+            try:
+                r = self.controller.calculate_weighted_score(
+                    req.device_id,
+                    req.accuracy_value,
+                    req.latency_value,
+                    req.energy_value,
+                )
+            except Exception as e:
+                return WeightedScoreResponse(success=False, message=f"error: {e}", result=None)
+
+            if not r.get("success"):
+                return WeightedScoreResponse(
+                    success=False, message=r.get("message", "error"), result=None
+                )
+            return WeightedScoreResponse(
+                success=True,
+                message=r.get("message", "ok"),
+                result=WeightedScoreData(**r["result"]),
+            )
+
         return app
 
     def start_rest_server_in_thread(self, host="0.0.0.0", port=5000):
@@ -172,3 +198,26 @@ class ALEWeightsResponse(BaseModel):
     total_devices: int
     ale_scores: list[ALEScoreData]
     failed_devices: list[str]
+
+# --- 가중 점수(WeightedScore) 스키마 : proto CalculateWeightedScore 대응 ---
+class WeightedScoreRequest(BaseModel):
+    device_id: str
+    accuracy_value: float  # 0-1000
+    latency_value: float   # 0-1000
+    energy_value: float    # 0-1000
+    time_range: str | None = "-24h"
+
+class WeightedScoreData(BaseModel):
+    device_id: str
+    accuracy_score: float
+    latency_score: float
+    energy_score: float
+    weighted_score: float
+    score_grade: str
+    calculation_timestamp: str
+    weights_used: dict | None = None
+
+class WeightedScoreResponse(BaseModel):
+    success: bool
+    message: str
+    result: WeightedScoreData | None = None
