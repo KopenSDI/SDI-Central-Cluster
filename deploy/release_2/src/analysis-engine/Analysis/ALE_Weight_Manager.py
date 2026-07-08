@@ -436,8 +436,93 @@ class ALEWeightManager:
                     base_score += 5
                 elif battery_wh < 300:
                     base_score -= 10
-            
+
             return max(0, min(100, base_score + device_factor))
-            
+
         except Exception:
             return 50.0  # 기본값
+
+    # ========================================================================================
+    # 가중치 적용 최종 점수 계산 (외부에서 들어온 실측 A/L/E 값 → ALE 가중 점수)
+    #  - Controller/Model 이 위임 호출하지만 기존에 구현이 누락되어 있던 메서드.
+    #  - 해시 기반 임시 점수(_calculate_*_score)와 달리, 입력값으로만 정직하게 계산한다.
+    # ========================================================================================
+    def calculate_weighted_score(self, device_id: str, accuracy_value: float,
+                                 latency_value: float, energy_value: float) -> Dict[str, Any]:
+        """
+        실측 A/L/E 값(각 0-1000)에 디바이스별 가중치를 적용해
+        최종 가중 점수(0-100)와 등급을 계산한다.
+
+        Args:
+            device_id: 디바이스 ID
+            accuracy_value: 정확도 측정값 (0-1000, 높을수록 좋음)
+            latency_value: 지연시간 측정값 (0-1000, 낮을수록 좋음)
+            energy_value: 에너지 측정값 (0-1000, 높을수록 좋음)
+
+        Returns:
+            {'success': bool, 'message': str, 'result': WeightedScoreResult|None}
+        """
+        try:
+            # 1) 입력값 유효성 검사 (0-1000)
+            v = self._validate_metric_values(accuracy_value, latency_value, energy_value)
+            if not v['valid']:
+                return {'success': False, 'message': v['message'], 'result': None}
+
+            # 2) 0-1000 측정값 → 0-100 점수로 변환 (L은 낮을수록 높은 점수)
+            scores = self._convert_metrics_to_scores(accuracy_value, latency_value, energy_value)
+
+            # 3) 디바이스별 가중치 조회 (없으면 기본 가중치)
+            weight_resp = self.get_weight(device_id)
+            weights = weight_resp.get('weights') or self.ale_weights['default']
+            aw = weights['accuracy_weight']
+            lw = weights['latency_weight']
+            ew = weights['energy_weight']
+
+            # 4) 가중 합산 — 가중치 합이 1이 아니어도 정규화하여 0-100 범위 유지
+            weight_sum = aw + lw + ew
+            if weight_sum <= 0:
+                weight_sum = 1.0
+            weighted_score = (
+                scores['accuracy'] * aw +
+                scores['latency'] * lw +
+                scores['energy'] * ew
+            ) / weight_sum
+
+            result = {
+                'device_id': device_id,
+                'weights_used': weights,
+                'accuracy_score': round(scores['accuracy'], 2),
+                'latency_score': round(scores['latency'], 2),
+                'energy_score': round(scores['energy'], 2),
+                'weighted_score': round(weighted_score, 2),
+                'score_grade': self._score_to_grade(weighted_score),
+                'calculation_timestamp': datetime.now().isoformat()
+            }
+
+            self.logger.info(
+                f"가중 점수 계산: {device_id} -> {result['weighted_score']} ({result['score_grade']})"
+            )
+            return {
+                'success': True,
+                'message': f'{device_id} 가중 점수 계산 완료',
+                'result': result
+            }
+
+        except Exception as e:
+            self.logger.error(f"가중 점수 계산 실패 ({device_id}): {e}")
+            return {
+                'success': False,
+                'message': f'가중 점수 계산 실패: {str(e)}',
+                'result': None
+            }
+
+    def _score_to_grade(self, score: float) -> str:
+        """0-100 가중 점수를 등급 문자열로 변환"""
+        if score >= 95: return 'A+'
+        if score >= 90: return 'A'
+        if score >= 85: return 'B+'
+        if score >= 80: return 'B'
+        if score >= 75: return 'C+'
+        if score >= 70: return 'C'
+        if score >= 60: return 'D'
+        return 'F'
