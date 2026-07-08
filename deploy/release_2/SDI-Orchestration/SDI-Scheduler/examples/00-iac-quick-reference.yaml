@@ -1,0 +1,159 @@
+# ============================================================
+# SDI Scheduler - IaC Quick Reference
+# ============================================================
+#
+# MALE Based Workload Scheduling Algorithm
+# (Accuracy-Oriented, Latency-Aware, Energy-Aware)
+#
+# 3 Algorithms Available via IaC:
+#   1. intent-driven       - QoS-aware, multi-objective optimization
+#   2. collaborative-swarm - PSO-inspired cross-cluster load balancing
+#   3. predictive-context  - Time-series prediction based proactive scheduling
+#
+# ============================================================
+
+# ============================================================
+# 1. Algorithm Selection Methods (Priority Order)
+# ============================================================
+
+# Method 1: Via ClusterAffinity AffinityName (Recommended)
+# --------------------------------------------------------
+placement:
+  clusterAffinities:
+    - affinityName: intent-driven     # Algorithm name here
+      labelSelector:
+        matchLabels:
+          # additional parameters...
+
+# Method 2: Via Label Selector
+# ----------------------------
+placement:
+  clusterAffinities:
+    - affinityName: my-affinity
+      labelSelector:
+        matchLabels:
+          sdi.keti.dev/scheduler-algorithm: "collaborative-swarm"
+
+# Method 3: Via Environment Variable (Namespace-specific)
+# -------------------------------------------------------
+# Set in SDI-Scheduler deployment:
+# env:
+#   - name: SDI_ALGORITHM_<NAMESPACE>
+#     value: "predictive-context"
+#
+# Example: SDI_ALGORITHM_IOT_PLATFORM=predictive-context
+
+# Method 4: Via Environment Variable (Kind-specific)
+# --------------------------------------------------
+# env:
+#   - name: SDI_ALGORITHM_<KIND>
+#     value: "intent-driven"
+#
+# Example: SDI_ALGORITHM_DEPLOYMENT=intent-driven
+
+# Method 5: Default Algorithm
+# ---------------------------
+# env:
+#   - name: SDI_DEFAULT_ALGORITHM
+#     value: "intent-driven"
+
+
+# ============================================================
+# 2. Intent-Driven Algorithm Parameters
+# ============================================================
+
+# All parameters via labelSelector.matchLabels:
+#
+# sdi.keti.dev/scheduler-algorithm: "intent-driven"
+# sdi.keti.dev/latency-budget-ms:   "50"       # Latency budget in ms
+# sdi.keti.dev/accuracy-target:     "95"       # Accuracy target (0-100)
+# sdi.keti.dev/energy-class:        "low"      # low | medium | high
+# sdi.keti.dev/compute-intensity:   "100"      # TFLOPS requirement
+
+# Use Cases:
+# - AI inference with latency SLA
+# - Real-time video processing
+# - Autonomous vehicle perception
+
+
+# ============================================================
+# 3. Collaborative-Swarm Algorithm Parameters
+# ============================================================
+
+# All parameters via labelSelector.matchLabels:
+#
+# sdi.keti.dev/scheduler-algorithm:    "collaborative-swarm"
+# sdi.keti.dev/region:                 "asia-northeast1"  # Target region
+# sdi.keti.dev/energy-class:           "low"              # Energy preference
+# sdi.keti.dev/collaboration-group:    "my-group"         # Group ID
+# sdi.keti.dev/load-balance-weight:    "0.6"              # 0-1
+# sdi.keti.dev/affinity-weight:        "0.4"              # 0-1
+
+# Use Cases:
+# - Multi-region microservices
+# - Cross-cluster load balancing
+# - Related workload co-location
+
+
+# ============================================================
+# 4. Predictive Context-Aware Algorithm Parameters
+# ============================================================
+
+# All parameters via labelSelector.matchLabels:
+#
+# sdi.keti.dev/scheduler-algorithm:  "predictive-context"
+# sdi.keti.dev/power-budget-watt:    "30"      # Power budget in watts
+# sdi.keti.dev/cpu-threshold:        "0.7"     # Max CPU utilization (0-1)
+# sdi.keti.dev/mem-threshold:        "0.8"     # Max memory utilization (0-1)
+# sdi.keti.dev/battery-threshold:    "0.3"     # Min battery level (0-1)
+# sdi.keti.dev/time-horizon-sec:     "600"     # Prediction horizon
+
+# Use Cases:
+# - IoT edge workloads
+# - Battery-powered devices
+# - Energy-constrained environments
+
+
+# ============================================================
+# 5. Cluster Labels Required
+# ============================================================
+
+# For Intent-Driven:
+# ------------------
+# accelerator: "gpu"                    # Required for high compute intensity
+# rtt-ms: "20"                          # Round-trip time in ms
+# sdi.keti.dev/energy-class: "low"      # Energy classification
+# sdi.keti.dev/cluster-type: "edge"     # Cluster type (edge/cloud)
+
+# For Collaborative-Swarm:
+# ------------------------
+# topology.kubernetes.io/region: "asia-northeast1"   # Standard region label
+# sdi.keti.dev/energy-class: "low"                   # Energy classification
+# sdi.keti.dev/collaboration-group: "my-group"       # Collaboration group
+
+# For Predictive Context-Aware:
+# -----------------------------
+# sdi.keti.dev/cluster-type: "mobile"     # mobile | edge | cloud
+# sdi.keti.dev/cpu-usage: "0.45"          # Current CPU usage (0-1)
+# sdi.keti.dev/mem-usage: "0.50"          # Current memory usage (0-1)
+# sdi.keti.dev/power-watt: "25"           # Current power consumption
+# sdi.keti.dev/battery-pct: "75"          # Battery percentage (0-100)
+# sdi.keti.dev/pred-cpu-usage: "0.50"     # Predicted CPU usage
+# sdi.keti.dev/pred-mem-usage: "0.55"     # Predicted memory usage
+# sdi.keti.dev/pred-confidence: "0.85"    # Prediction confidence (0-1)
+# sdi.keti.dev/cpu-trend: "stable"        # stable | increasing | decreasing
+
+
+# ============================================================
+# 6. Debug Mode
+# ============================================================
+
+# Enable debug logging in SDI-Scheduler deployment:
+# env:
+#   - name: SDI_DEBUG
+#     value: "true"
+
+# Log output format:
+# [SDI] Filter: cluster=edge-cluster, algorithm=IntentDrivenV2, workload=default/my-app
+# [SDI] Score: cluster=edge-cluster, algorithm=IntentDrivenV2, workload=default/my-app
+# [SDI] Score result: cluster=edge-cluster, score=750

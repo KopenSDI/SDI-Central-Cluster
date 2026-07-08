@@ -1,0 +1,173 @@
+# ============================================================
+# SDI Scheduler - Predictive Context-Aware Algorithm Example
+# ============================================================
+#
+# Use Case: IoT/Edge workloads, Battery-powered devices, Energy optimization
+# Algorithm: Time-series prediction based proactive scheduling
+#
+# Reference Papers:
+# - "Context-aware Task Scheduling for Time Series Prediction in MEC" (Springer)
+# - "MEWF: Microservice Energy consumption and Workload Forecaster"
+# - "Time Series-Based Edge Resource Prediction" (MDPI Processes 2023)
+#
+# Features:
+# - Proactive resource reservation based on predicted usage
+# - Battery-aware scheduling for mobile/edge devices
+# - Power budget enforcement
+# - Trend-based filtering (avoids resource-depleting clusters)
+#
+# ============================================================
+
+---
+# PropagationPolicy with Predictive Context-Aware scheduling
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: iot-sensor-policy
+  namespace: iot-platform
+spec:
+  schedulerName: sdi-scheduler
+
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      labelSelector:
+        matchLabels:
+          workload-type: iot-sensor
+
+  placement:
+    clusterAffinities:
+      - affinityName: predictive-context   # Algorithm selection
+
+        labelSelector:
+          matchLabels:
+            # Predictive Context-Aware parameters
+            sdi.keti.dev/scheduler-algorithm: "predictive-context"
+            sdi.keti.dev/power-budget-watt: "30"         # 30W power budget
+            sdi.keti.dev/cpu-threshold: "0.7"            # 70% CPU threshold
+            sdi.keti.dev/mem-threshold: "0.8"            # 80% memory threshold
+            sdi.keti.dev/battery-threshold: "0.3"        # 30% minimum battery
+            sdi.keti.dev/time-horizon-sec: "600"         # 10 minute prediction horizon
+
+            # Prefer edge clusters
+            sdi.keti.dev/cluster-type: "edge"
+
+---
+# Example: IoT Data Collector
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-collector
+  namespace: iot-platform
+  labels:
+    app: sensor-collector
+    workload-type: iot-sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor-collector
+  template:
+    metadata:
+      labels:
+        app: sensor-collector
+        workload-type: iot-sensor
+    spec:
+      containers:
+        - name: collector
+          image: ketidevit2/sensor-collector:v1
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          env:
+            - name: COLLECTION_INTERVAL_SEC
+              value: "10"
+            - name: POWER_MODE
+              value: "low"
+
+---
+# Example: Edge Analytics (lightweight processing)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-analytics
+  namespace: iot-platform
+  labels:
+    app: edge-analytics
+    workload-type: iot-sensor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-analytics
+  template:
+    metadata:
+      labels:
+        app: edge-analytics
+        workload-type: iot-sensor
+    spec:
+      containers:
+        - name: analytics
+          image: ketidevit2/edge-analytics:v1
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+# Cluster labels required for Predictive Context-Aware algorithm
+# These should be updated by a monitoring agent (e.g., Prometheus + label-updater)
+#
+# kubectl label cluster edge-mobile-01 \
+#   sdi.keti.dev/cluster-type=mobile \
+#   sdi.keti.dev/cpu-usage=0.45 \
+#   sdi.keti.dev/mem-usage=0.50 \
+#   sdi.keti.dev/power-watt=25 \
+#   sdi.keti.dev/battery-pct=75 \
+#   sdi.keti.dev/energy-class=low \
+#   sdi.keti.dev/cpu-trend=stable \
+#   sdi.keti.dev/pred-cpu-usage=0.50 \
+#   sdi.keti.dev/pred-mem-usage=0.55 \
+#   sdi.keti.dev/pred-confidence=0.85
+#
+# For time-series prediction integration:
+# - Deploy a prediction service that updates these labels periodically
+# - Use LSTM/ARIMA models for CPU/Memory prediction
+# - Update sdi.keti.dev/pred-* labels with predictions
+
+---
+# ConfigMap for prediction service configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prediction-config
+  namespace: iot-platform
+data:
+  prediction.yaml: |
+    # Prediction service configuration
+    update_interval_sec: 60
+    prediction_horizon_sec: 600
+    model_type: "lstm"  # Options: lstm, arima, holt-winters
+
+    # InfluxDB connection for historical data
+    influxdb:
+      url: "http://influxdb.monitoring.svc.cluster.local:8086"
+      org: "keti"
+      bucket: "cluster-metrics"
+
+    # Labels to update
+    labels:
+      - sdi.keti.dev/pred-cpu-usage
+      - sdi.keti.dev/pred-mem-usage
+      - sdi.keti.dev/pred-power-watt
+      - sdi.keti.dev/pred-battery-pct
+      - sdi.keti.dev/pred-confidence
+      - sdi.keti.dev/cpu-trend
+      - sdi.keti.dev/mem-trend

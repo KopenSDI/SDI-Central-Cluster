@@ -94,7 +94,7 @@ func ValidatePriorityBuckets(buckets []malev1alpha1.PriorityBucket) error {
 		// Check for overlaps with other buckets
 		for j := i + 1; j < len(buckets); j++ {
 			other := buckets[j]
-			if (bucket.Min <= other.Max && bucket.Max >= other.Min) {
+			if bucket.Min <= other.Max && bucket.Max >= other.Min {
 				return fmt.Errorf("buckets %s and %s overlap: [%.3f, %.3f] vs [%.3f, %.3f]",
 					bucket.Name, other.Name, bucket.Min, bucket.Max, other.Min, other.Max)
 			}
@@ -103,4 +103,3 @@ func ValidatePriorityBuckets(buckets []malev1alpha1.PriorityBucket) error {
 
 	return nil
 }
-

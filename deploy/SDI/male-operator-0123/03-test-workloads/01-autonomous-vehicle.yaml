@@ -1,0 +1,62 @@
+# MALE Paper Case 1: Autonomous Vehicles (자율주행)
+#
+# ALE Values: A=0.6, L=0.3, E=0.1
+# User Criticality: A (Best-Effort)
+# Expected Result: C (Safety-Critical)
+# Reason: A >= 0.6 && L >= 0.3 (Autonomous Vehicles pattern)
+#
+# 테스트 흐름:
+# 1. Central: Deployment + MaleWorkload 생성
+# 2. Central: MALE-Operator가 MC Criticality 재정의 (A → C)
+# 3. Karmada: PropagationPolicy로 Edge 전파
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-vehicle
+  namespace: male-test
+  labels:
+    app: autonomous-vehicle
+    male.keti.dev/managed: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autonomous-vehicle
+  template:
+    metadata:
+      labels:
+        app: autonomous-vehicle
+    spec:
+      containers:
+        - name: perception
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: autonomous-vehicle
+  namespace: male-test
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: autonomous-vehicle
+  mission: "autonomous-vehicle-perception"
+  importance:
+    accuracy: 0.6
+    latency: 0.3
+    energy: 0.1
+  mcSpec:
+    criticality: "A"
+    rtPeriod: 100
+    rtWcet: 30
+    rtDeadline: 100
+    missionId: "av-mission-1"
+  allowPolicyOverride: true

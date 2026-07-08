@@ -1,0 +1,75 @@
+# MalePolicy - 클러스터 전체 MALE 평가 정책
+#
+# 이 정책은 모든 MaleWorkload에 적용되며:
+# 1. ALE 가중치 정의 (MixedScore 계산용)
+# 2. 값 범위 제한
+# 3. 우선순위 버킷 매핑
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MalePolicy
+metadata:
+  name: default-male-policy
+spec:
+  # ============================================
+  # ALE 가중치 (합계 = 1.0)
+  # ============================================
+  # MixedScore = wA*A + wL*L + wE*E
+  #
+  # 이 값들은 조직의 우선순위에 따라 조정 가능:
+  # - 안전 중심: latency 가중치 높임
+  # - 정확도 중심: accuracy 가중치 높임
+  # - 비용 중심: energy 가중치 높임
+  weights:
+    accuracy: 0.4    # 정확도 가중치
+    latency: 0.4     # 지연시간 가중치
+    energy: 0.2      # 에너지 가중치
+
+  # ============================================
+  # 값 범위 제한
+  # ============================================
+  # 사용자가 입력한 값을 이 범위로 클램핑
+  bounds:
+    accuracy:
+      min: 0.0
+      max: 1.0
+    latency:
+      min: 0.0
+      max: 1.0
+    energy:
+      min: 0.0
+      max: 1.0
+
+  # ============================================
+  # 우선순위 버킷
+  # ============================================
+  # MixedScore를 기반으로 PriorityClass 할당
+  #
+  # Score Range  →  PriorityClass
+  # [0.8, 1.0]   →  male-critical
+  # [0.5, 0.8)   →  male-high
+  # [0.2, 0.5)   →  male-medium
+  # [0.0, 0.2)   →  male-low
+  priorityBuckets:
+    - name: male-critical
+      min: 0.8
+      max: 1.0
+    - name: male-high
+      min: 0.5
+      max: 0.8
+    - name: male-medium
+      min: 0.2
+      max: 0.5
+    - name: male-low
+      min: 0.0
+      max: 0.2
+
+  # ============================================
+  # 오버라이드 설정 (선택)
+  # ============================================
+  # 외부 소스(ConfigMap, Webhook)에서 중요도 값 오버라이드
+  override:
+    enabled: false
+    source:
+      type: ConfigMap
+      namespace: male-system
+      name: male-policy-overrides

@@ -1,0 +1,55 @@
+# MALE Paper Case 3: IoT Sensor Networks (IoT 센서)
+#
+# ALE Values: A=0.2, L=0.1, E=0.7
+# User Criticality: C (Safety-Critical)
+# Expected Result: A (Best-Effort RT)
+# Reason: Energy-critical mission (E >= 0.5 && L < 0.5)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-sensor
+  namespace: male-test
+  labels:
+    app: iot-sensor
+    male.keti.dev/managed: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iot-sensor
+  template:
+    metadata:
+      labels:
+        app: iot-sensor
+    spec:
+      containers:
+        - name: collector
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: iot-sensor
+  namespace: male-test
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: iot-sensor
+  mission: "iot-sensor-data-collection"
+  importance:
+    accuracy: 0.2
+    latency: 0.1
+    energy: 0.7
+  mcSpec:
+    criticality: "C"
+    rtPeriod: 1000
+    rtWcet: 100
+    rtDeadline: 1000
+    missionId: "iot-mission-1"
+  allowPolicyOverride: true

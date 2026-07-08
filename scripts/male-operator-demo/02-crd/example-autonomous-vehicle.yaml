@@ -1,0 +1,73 @@
+# MALE Paper Case 1: Autonomous Vehicles (자율주행)
+#
+# ALE Values: A=0.6, L=0.3, E=0.1
+# Expected: Criticality A → C (Safety-Critical)
+# Reason: A >= 0.6 && L >= 0.3 (자율주행 패턴)
+#
+# 자율주행 차량은 정확한 객체 인식이 필수적이며
+# 적당한 실시간 응답이 필요함 → Safety-Critical
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autonomous-vehicle-perception
+  namespace: default
+  labels:
+    app: av-perception
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: av-perception
+  template:
+    metadata:
+      labels:
+        app: av-perception
+    spec:
+      containers:
+      - name: perception
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: autonomous-vehicle
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: autonomous-vehicle-perception
+
+  mission: "autonomous-vehicle-perception"
+
+  # MALE Paper Case 1: Autonomous Vehicles
+  importance:
+    accuracy: 0.6    # 높은 정확도 (객체 인식)
+    latency: 0.3     # 중간 지연시간 (실시간 응답)
+    energy: 0.1      # 낮은 에너지 (차량 전원)
+
+  # 사용자가 A로 지정했지만, ALE 분석 후 C로 재정의됨
+  mcSpec:
+    criticality: "A"
+    rtPeriod: 100
+    rtWcet: 30
+    rtDeadline: 100
+    missionId: "av-mission-1"
+
+  allowPolicyOverride: true
+
+  schedulingHints:
+    addLabels:
+      workload-type: "autonomous-vehicle"
+    addAnnotations:
+      description: "Autonomous vehicle perception workload"

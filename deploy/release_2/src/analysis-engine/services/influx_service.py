@@ -4,14 +4,15 @@ from typing import Optional, List, Dict, Any
 from influxdb_client import InfluxDBClient
 from datetime import datetime, timedelta
 
-# InfluxDB 설정
-INFLUX_URL = "http://10.0.5.52:32086"
-INFLUX_TOKEN = "6hZxFzOacf-6TlnlhDUWjLnp1EtefcY9ViBziEfEPeklZYgijfdQrslUenifowQZ7cMQmuHk74iToaGK6mEG-A=="
-INFLUX_ORG = "keti"
-INFLUX_BUCKET = "turtlebot"
-
-#Edit 필요- 터틀봇 초기 정보를 읽어드림  수정해야할것 -> 초기 인플럭스 디비에서 읽어 들이게해야함 
-BOTS = ["TURTLEBOT3-Burger-1", "TURTLEBOT3-Burger-2"]
+# influx_reader.py와 설정 공유 (환경변수 기반)
+from influx_reader import (
+    INFLUX_URL,
+    INFLUX_TOKEN,
+    INFLUX_ORG,
+    INFLUX_BUCKET,
+    DEFAULT_BOTS,
+    get_available_bots
+)
 
 class InfluxService:
     def __init__(self):
@@ -81,10 +82,42 @@ class InfluxService:
             logging.error(f"배터리 히스토리 조회 실패 (bot={bot}): {e}")
             return []
 
+    def discover_bots(self, lookback: str = "-24h") -> List[str]:
+        """InfluxDB에서 사용 가능한 모든 BOT 목록을 동적으로 조회"""
+        flux = f"""
+        from(bucket: "{self.bucket}")
+            |> range(start: {lookback})
+            |> filter(fn: (r) => r._measurement == "battery")
+            |> keep(columns: ["bot"])
+            |> distinct(column: "bot")
+        """
+
+        try:
+            tables = self.query_api.query(org=self.org, query=flux)
+            bots = []
+            for table in tables:
+                for rec in table.records:
+                    bot_name = rec.get_value()
+                    if bot_name and bot_name not in bots:
+                        bots.append(bot_name)
+
+            if bots:
+                logging.info(f"InfluxDB에서 {len(bots)}개 BOT 발견: {bots}")
+                return bots
+            else:
+                logging.warning("InfluxDB에서 BOT을 찾지 못함 - 기본값 사용")
+                return DEFAULT_BOTS
+
+        except Exception as e:
+            logging.warning(f"BOT 목록 조회 실패: {e} - 기본값 사용")
+            return DEFAULT_BOTS
+
     def get_all_bots_battery_status(self, lookback: str = "-30m") -> List[Dict[str, Any]]:
-        """모든 터틀봇의 배터리 상태 조회"""
+        """모든 터틀봇의 배터리 상태 조회 (동적 BOT 조회)"""
         results = []
-        for bot in BOTS:
+        bots = self.discover_bots()  # 동적으로 BOT 목록 조회
+
+        for bot in bots:
             wh = self.get_latest_battery_status(bot, lookback)
             results.append({
                 'bot': bot,
@@ -107,5 +140,5 @@ class InfluxService:
             return 'critical'
 
     def get_available_bots(self) -> List[str]:
-        """사용 가능한 터틀봇 목록 반환"""
-        return BOTS 
+        """사용 가능한 터틀봇 목록 반환 (동적 조회)"""
+        return self.discover_bots() 

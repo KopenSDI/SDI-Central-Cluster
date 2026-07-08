@@ -1,0 +1,16 @@
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: sdi-vision-propagation
+  namespace: sdi-demo
+spec:
+  # 1. 어떤 리소스를 보낼 것인가? (우리가 만든 파드 지정)
+  resourceSelectors:
+    - apiVersion: v1
+      kind: Pod
+      name: keti-robotics-final-vision-processor
+  # 2. 어디로 보낼 것인가? (선배님이 확인해준 edge-cluster 지정)
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - edge-cluster

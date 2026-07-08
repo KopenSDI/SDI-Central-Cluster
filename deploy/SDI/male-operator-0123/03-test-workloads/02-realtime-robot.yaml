@@ -1,0 +1,55 @@
+# MALE Paper Case 2: Real-Time Robotics (실시간 로봇)
+#
+# ALE Values: A=0.1, L=0.7, E=0.2
+# User Criticality: A (Best-Effort)
+# Expected Result: B (Mission-Critical)
+# Reason: Latency-critical mission (L >= 0.7)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime-robot
+  namespace: male-test
+  labels:
+    app: realtime-robot
+    male.keti.dev/managed: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: realtime-robot
+  template:
+    metadata:
+      labels:
+        app: realtime-robot
+    spec:
+      containers:
+        - name: controller
+          image: nginx:alpine
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: realtime-robot
+  namespace: male-test
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: realtime-robot
+  mission: "realtime-robot-control"
+  importance:
+    accuracy: 0.1
+    latency: 0.7
+    energy: 0.2
+  mcSpec:
+    criticality: "A"
+    rtPeriod: 50
+    rtWcet: 15
+    rtDeadline: 50
+    missionId: "robot-mission-1"
+  allowPolicyOverride: true

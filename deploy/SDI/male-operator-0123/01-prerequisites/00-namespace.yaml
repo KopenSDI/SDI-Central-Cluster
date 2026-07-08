@@ -1,0 +1,17 @@
+# MALE-Operator 네임스페이스
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: male-system
+  labels:
+    app.kubernetes.io/name: male-operator
+    app.kubernetes.io/component: operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: male-test
+  labels:
+    app.kubernetes.io/name: male-operator
+    app.kubernetes.io/component: test

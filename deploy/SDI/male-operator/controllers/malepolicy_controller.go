@@ -159,4 +159,3 @@ func (r *MalePolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&malev1alpha1.MalePolicy{}).
 		Complete(r)
 }
-

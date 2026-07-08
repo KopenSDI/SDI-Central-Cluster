@@ -1,0 +1,25 @@
+# PropagationPolicy - male-test 워크로드를 Edge 클러스터로 전파
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: male-test-propagation
+  namespace: male-test
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      labelSelector:
+        matchExpressions:
+          - key: app
+            operator: In
+            values:
+              - autonomous-vehicle
+              - realtime-robot
+              - iot-sensor
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - edge-cluster
+  # 전파 옵션
+  propagateDeps: true

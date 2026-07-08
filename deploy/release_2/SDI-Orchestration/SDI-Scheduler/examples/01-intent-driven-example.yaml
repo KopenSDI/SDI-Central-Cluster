@@ -1,0 +1,96 @@
+# ============================================================
+# SDI Scheduler - Intent-Driven Algorithm Example
+# ============================================================
+#
+# Use Case: Latency-sensitive AI workloads (VR/AR, Autonomous Vehicles)
+# Algorithm: Multi-objective optimization based on Intent Vector
+#
+# Reference Papers:
+# - "Next Step Towards Intent-based Scheduling" (ADVANCE 2025)
+# - "KubeDSM: Dynamic Scheduling and Migration" (arXiv:2501.07130)
+#
+# ============================================================
+
+---
+# PropagationPolicy with Intent-Driven scheduling
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: autonomous-vehicle-policy
+  namespace: ai-workloads
+spec:
+  # Use SDI Scheduler
+  schedulerName: sdi-scheduler
+
+  # Target resources
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: perception-module
+
+  # Placement with Intent-Driven algorithm selection
+  placement:
+    clusterAffinities:
+      - affinityName: intent-driven   # Algorithm selection via AffinityName
+
+        # Algorithm-specific parameters via labelSelector
+        labelSelector:
+          matchLabels:
+            # Intent-Driven parameters
+            sdi.keti.dev/scheduler-algorithm: "intent-driven"
+            sdi.keti.dev/latency-budget-ms: "50"        # 50ms latency budget
+            sdi.keti.dev/accuracy-target: "95"          # 95% accuracy target
+            sdi.keti.dev/energy-class: "medium"         # Medium energy consumption
+            sdi.keti.dev/compute-intensity: "100"       # 100 TFLOPS requirement
+
+            # Cluster requirements
+            accelerator: "gpu"                          # Require GPU cluster
+
+---
+# Example Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: perception-module
+  namespace: ai-workloads
+  labels:
+    app: perception-module
+    sdi.keti.dev/workload-type: "ai-inference"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: perception-module
+  template:
+    metadata:
+      labels:
+        app: perception-module
+    spec:
+      schedulerName: sdi-scheduler
+      containers:
+        - name: perception
+          image: ketidevit2/perception-module:v1
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+          env:
+            - name: LATENCY_BUDGET_MS
+              value: "50"
+            - name: ACCURACY_TARGET
+              value: "0.95"
+
+---
+# Alternative: Environment-based algorithm selection
+# Set this in SDI-Scheduler deployment to use Intent-Driven for specific namespaces
+#
+# env:
+#   - name: SDI_ALGORITHM_AI_WORKLOADS
+#     value: "intent-driven"
+#   - name: SDI_DEFAULT_ALGORITHM
+#     value: "intent-driven"

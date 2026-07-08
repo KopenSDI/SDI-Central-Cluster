@@ -34,6 +34,19 @@ type MaleWorkloadSpec struct {
 	// +kubebuilder:validation:Required
 	Importance ImportanceValues `json:"importance"`
 
+	// MCSpec defines Mixed-Criticality parameters for RT scheduling on Edge cluster
+	// +kubebuilder:validation:Optional
+	MCSpec *MCSpec `json:"mcSpec,omitempty"`
+
+	// Container spec for the workload (used to generate RTContainer)
+	// +kubebuilder:validation:Optional
+	Container *ContainerSpec `json:"container,omitempty"`
+
+	// Replicas is the number of desired replicas
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=1
+	Replicas int32 `json:"replicas,omitempty"`
+
 	// AllowPolicyOverride allows policy engine to override importance values
 	// +kubebuilder:default=true
 	AllowPolicyOverride bool `json:"allowPolicyOverride,omitempty"`
@@ -87,13 +100,116 @@ type SchedulingHints struct {
 	AddAnnotations map[string]string `json:"addAnnotations,omitempty"`
 }
 
+// MCSpec defines Mixed-Criticality parameters for RT-Kube scheduling
+// Based on MALE paper: Mission-driven ALE evaluation determines criticality
+type MCSpec struct {
+	// Criticality Level (C > B > A)
+	// - C: Safety-Critical (collision avoidance, robot arm control)
+	// - B: Mission-Critical (SLAM, sensor processing)
+	// - A: Best-Effort RT (logging, monitoring)
+	// +kubebuilder:validation:Enum=A;B;C
+	// +kubebuilder:default="A"
+	Criticality string `json:"criticality,omitempty"`
+
+	// RTPeriod is the task period in milliseconds
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=100
+	RTPeriod int32 `json:"rtPeriod,omitempty"`
+
+	// RTWcet is the Worst-Case Execution Time in milliseconds
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=30
+	RTWcet int32 `json:"rtWcet,omitempty"`
+
+	// RTDeadline is the deadline in milliseconds (defaults to RTPeriod)
+	// +kubebuilder:validation:Minimum=1
+	RTDeadline int32 `json:"rtDeadline,omitempty"`
+
+	// MissionId groups related workloads for coordinated scheduling
+	MissionId string `json:"missionId,omitempty"`
+}
+
+// EffectiveMCSpec shows the MC spec after MALE-Operator processing
+type EffectiveMCSpec struct {
+	// Criticality is the final criticality level determined by MALE-Operator
+	// +kubebuilder:validation:Enum=A;B;C
+	Criticality string `json:"criticality,omitempty"`
+
+	// RTPeriod is the task period in milliseconds
+	RTPeriod int32 `json:"rtPeriod,omitempty"`
+
+	// RTWcet is the Worst-Case Execution Time in milliseconds
+	RTWcet int32 `json:"rtWcet,omitempty"`
+
+	// RTDeadline is the deadline in milliseconds
+	RTDeadline int32 `json:"rtDeadline,omitempty"`
+
+	// MissionId for grouping
+	MissionId string `json:"missionId,omitempty"`
+
+	// OverrideReason explains why criticality was changed (if overridden)
+	OverrideReason string `json:"overrideReason,omitempty"`
+
+	// MissionType detected from ALE importance values (based on MALE paper)
+	// Values: "accuracy-critical", "latency-critical", "energy-critical", "balanced"
+	MissionType string `json:"missionType,omitempty"`
+}
+
+// ContainerSpec defines the container specification for RTContainer
+type ContainerSpec struct {
+	// Image is the container image
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// Command is the entrypoint command
+	Command []string `json:"command,omitempty"`
+
+	// Args are the command arguments
+	Args []string `json:"args,omitempty"`
+
+	// Env are environment variables
+	Env []EnvVar `json:"env,omitempty"`
+
+	// Resources are the resource requirements
+	Resources *ResourceRequirements `json:"resources,omitempty"`
+}
+
+// EnvVar defines an environment variable
+type EnvVar struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// ResourceRequirements defines resource requests and limits
+type ResourceRequirements struct {
+	Requests *ResourceList `json:"requests,omitempty"`
+	Limits   *ResourceList `json:"limits,omitempty"`
+}
+
+// ResourceList defines CPU and memory resources
+type ResourceList struct {
+	// CPU resource (e.g., "100m", "0.5", "1")
+	// +kubebuilder:default="100m"
+	CPU string `json:"cpu,omitempty"`
+
+	// Memory resource (e.g., "128Mi", "1Gi")
+	// +kubebuilder:default="128Mi"
+	Memory string `json:"memory,omitempty"`
+}
+
 // MaleWorkloadStatus defines the observed state of MaleWorkload
 type MaleWorkloadStatus struct {
 	// EffectiveImportance shows the importance values after override application
 	// +kubebuilder:validation:Optional
 	EffectiveImportance *ImportanceValues `json:"effectiveImportance,omitempty"`
 
+	// EffectiveMCSpec shows the MC spec after MALE-Operator processing
+	// Criticality may be overridden based on ALE importance analysis
+	// +kubebuilder:validation:Optional
+	EffectiveMCSpec *EffectiveMCSpec `json:"effectiveMcSpec,omitempty"`
+
 	// MixedScore is the calculated mixed importance score (0~1)
+	// Based on MALE paper formula: MixedScore = wA*A + wL*L + wE*E
 	// +kubebuilder:validation:Optional
 	MixedScore *float64 `json:"mixedScore,omitempty"`
 
@@ -135,4 +251,3 @@ type MaleWorkloadList struct {
 func init() {
 	SchemeBuilder.Register(&MaleWorkload{}, &MaleWorkloadList{})
 }
-

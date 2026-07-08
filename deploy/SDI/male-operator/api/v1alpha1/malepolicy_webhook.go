@@ -54,4 +54,3 @@ func (r *MalePolicy) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		For(r).
 		Complete()
 }
-

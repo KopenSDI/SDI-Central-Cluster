@@ -1,0 +1,74 @@
+# MALE Paper Case 3: IoT Sensor Networks (IoT 센서)
+#
+# ALE Values: A=0.2, L=0.1, E=0.7
+# Expected: Criticality C → A (Best-Effort RT)
+# Reason: Energy-critical mission with relaxed latency (E >= 0.5 && L < 0.5)
+#
+# IoT 센서는 배터리 수명이 가장 중요하며
+# 지연시간 요구사항은 느슨함 → Best-Effort RT
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-sensor-collector
+  namespace: default
+  labels:
+    app: iot-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: iot-collector
+  template:
+    metadata:
+      labels:
+        app: iot-collector
+    spec:
+      containers:
+      - name: collector
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "50m"      # 낮은 CPU (에너지 절약)
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
+---
+apiVersion: male.keti.dev/v1alpha1
+kind: MaleWorkload
+metadata:
+  name: iot-sensor
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: iot-sensor-collector
+
+  mission: "iot-sensor-data-collection"
+
+  # MALE Paper Case 3: IoT Sensor Networks
+  importance:
+    accuracy: 0.2    # 낮은 정확도 (대략적 데이터)
+    latency: 0.1     # 낮은 지연시간 (지연 허용)
+    energy: 0.7      # 높은 에너지 (배터리 수명 중요)
+
+  # 사용자가 C로 지정했지만, ALE 분석 후 A로 재정의됨
+  # (에너지 효율이 중요하므로 Safety-Critical 불필요)
+  mcSpec:
+    criticality: "C"
+    rtPeriod: 1000    # 긴 주기 (에너지 절약)
+    rtWcet: 100
+    rtDeadline: 1000
+    missionId: "iot-mission-1"
+
+  allowPolicyOverride: true
+
+  schedulingHints:
+    addLabels:
+      workload-type: "iot-sensor"
+    addAnnotations:
+      description: "IoT sensor data collection workload"

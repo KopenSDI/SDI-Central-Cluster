@@ -1,0 +1,142 @@
+# ============================================================
+# SDI Scheduler - Collaborative-Swarm Algorithm Example
+# ============================================================
+#
+# Use Case: Multi-cluster load balancing, Regional affinity
+# Algorithm: PSO-inspired cross-cluster optimization
+#
+# Reference Papers:
+# - "Entropy Weight + Multi-Strategy PSO" (Springer s10586-024-05079-x)
+# - "Multi-cluster Layer-Sharing Container Scheduling" (Springer)
+#
+# Features:
+# - Cross-cluster load balancing
+# - Region affinity scoring
+# - Collaboration group awareness
+# - Energy-aware placement
+#
+# ============================================================
+
+---
+# PropagationPolicy with Collaborative-Swarm scheduling
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: swarm-load-balanced-policy
+  namespace: microservices
+spec:
+  schedulerName: sdi-scheduler
+
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: ecommerce-platform
+
+  placement:
+    clusterAffinities:
+      - affinityName: collaborative-swarm   # Algorithm selection
+
+        labelSelector:
+          matchLabels:
+            # Collaborative-Swarm parameters
+            sdi.keti.dev/scheduler-algorithm: "collaborative-swarm"
+            sdi.keti.dev/region: "asia-northeast1"          # Target region
+            sdi.keti.dev/energy-class: "low"                # Prefer low-energy clusters
+            sdi.keti.dev/collaboration-group: "ecommerce"   # Group related workloads
+            sdi.keti.dev/load-balance-weight: "0.6"         # 60% weight on load balance
+            sdi.keti.dev/affinity-weight: "0.4"             # 40% weight on region affinity
+
+    # Replica distribution
+    replicaScheduling:
+      replicaSchedulingType: Divided
+      replicaDivisionPreference: Weighted
+      weightPreference:
+        staticWeightList:
+          - targetCluster:
+              clusterNames:
+                - edge-cluster-asia
+            weight: 3
+          - targetCluster:
+              clusterNames:
+                - edge-cluster-europe
+            weight: 2
+
+---
+# Example: API Gateway Service (part of collaboration group)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: microservices
+  labels:
+    app: api-gateway
+    app.kubernetes.io/part-of: ecommerce-platform
+    sdi.keti.dev/collaboration-group: ecommerce
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        sdi.keti.dev/collaboration-group: ecommerce
+    spec:
+      containers:
+        - name: gateway
+          image: ketidevit2/api-gateway:v1
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          ports:
+            - containerPort: 8080
+
+---
+# Example: Product Service (same collaboration group)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: microservices
+  labels:
+    app: product-service
+    app.kubernetes.io/part-of: ecommerce-platform
+    sdi.keti.dev/collaboration-group: ecommerce
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+        sdi.keti.dev/collaboration-group: ecommerce
+    spec:
+      containers:
+        - name: product
+          image: ketidevit2/product-service:v1
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+
+---
+# Cluster labels required for Collaborative-Swarm algorithm
+# Apply these to member clusters:
+#
+# kubectl label cluster edge-cluster-asia \
+#   topology.kubernetes.io/region=asia-northeast1 \
+#   sdi.keti.dev/energy-class=low \
+#   sdi.keti.dev/collaboration-group=ecommerce
+#
+# kubectl label cluster edge-cluster-europe \
+#   topology.kubernetes.io/region=europe-west1 \
+#   sdi.keti.dev/energy-class=medium
