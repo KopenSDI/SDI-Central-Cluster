@@ -106,6 +106,57 @@ class InfluxService:
         else:
             return 'critical'
 
+    # ------------------------------------------------------------------
+    # 실측 A/L/E 메트릭 조회 (데이터 준비 계층)
+    #  - 아래 measurement/field 스키마로 프로듀서가 InfluxDB에 적재하면
+    #    ALE 점수가 실측 기반으로 자동 전환된다.
+    #  - 아직 데이터가 없으면 None 을 반환 → 상위(Manager)에서 fallback 처리.
+    #    · accuracy : measurement="accuracy", field="value" (0-100)
+    #    · latency  : measurement="latency",  field="ms"    (밀리초)
+    #    · energy   : 기존 battery(wh) 재사용
+    # ------------------------------------------------------------------
+    def get_latest_metric(self, bot: str, measurement: str, field: str,
+                          lookback: str = "-30m") -> Optional[float]:
+        """임의 measurement/field 의 최신 실측값 조회 (없으면 None)"""
+        flux = f"""
+        from(bucket: "{self.bucket}")
+            |> range(start: {lookback})
+            |> filter(fn: (r) => r._measurement == "{measurement}" and r.bot == "{bot}" and r._field == "{field}")
+            |> last()
+        """
+        try:
+            tables = self.query_api.query(org=self.org, query=flux)
+            for table in tables:
+                for rec in table.records:
+                    try:
+                        return float(rec.get_value())
+                    except (TypeError, ValueError):
+                        return None
+        except Exception as e:
+            logging.error(f"InfluxDB 메트릭 조회 실패 (bot={bot}, {measurement}.{field}): {e}")
+            return None
+        return None
+
+    def get_latest_accuracy(self, bot: str, lookback: str = "-30m") -> Optional[float]:
+        """최신 실측 정확도(0-100) 조회"""
+        return self.get_latest_metric(bot, "accuracy", "value", lookback)
+
+    def get_latest_latency(self, bot: str, lookback: str = "-30m") -> Optional[float]:
+        """최신 실측 지연시간(ms) 조회"""
+        return self.get_latest_metric(bot, "latency", "ms", lookback)
+
+    def get_device_metrics(self, bot: str, lookback: str = "-30m") -> Dict[str, Any]:
+        """
+        디바이스의 실측 A/L/E 메트릭을 한 번에 모아 반환한다.
+        (Controller/Engine 이 device_data 로 그대로 넘길 수 있는 형태)
+        측정값이 없는 항목은 None 이며, 상위에서 fallback 된다.
+        """
+        return {
+            "accuracy_measured": self.get_latest_accuracy(bot, lookback),
+            "latency_ms": self.get_latest_latency(bot, lookback),
+            "battery_wh": self.get_latest_battery_status(bot, lookback),
+        }
+
     def get_available_bots(self) -> List[str]:
         """사용 가능한 터틀봇 목록 반환"""
         return BOTS 
