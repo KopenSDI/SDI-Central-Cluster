@@ -9,41 +9,53 @@ import os
 # 로거 설정
 logger = logging.getLogger(__name__)
 
+
+# 모든 번들 리소스는 Karmada apiserver로 간다. MaleWorkload CRD도 Karmada에 설치되어
+# 있고 male-operator가 Karmada를 감시한다 (2026-03 전환; 호스트 클러스터의 CRD는 레거시).
+# 호스트 클러스터로 보내야 하는 리소스가 생기면 여기에 kind를 추가.
+HOST_ONLY_KINDS: set = set()
+
+
+def _load_api_client(config_path: str, fallback_incluster: bool, label: str) -> client.ApiClient:
+    """주어진 kubeconfig 경로(또는 in-cluster/default)로 별도의 ApiClient를 만든다."""
+    try:
+        if os.path.exists(config_path):
+            configuration = client.Configuration()
+            config.load_kube_config(config_file=config_path, client_configuration=configuration)
+            logger.info(f"Successfully loaded {label} config from {config_path}")
+        elif fallback_incluster:
+            configuration = client.Configuration()
+            try:
+                config.load_incluster_config(client_configuration=configuration)
+            except config.ConfigException:
+                config.load_kube_config(client_configuration=configuration)
+            logger.warning(f"{label} config not found at {config_path}. Using default config.")
+        else:
+            configuration = client.Configuration()
+            config.load_kube_config(client_configuration=configuration)
+            logger.warning(f"{label} config not found at {config_path}. Using default kube config.")
+    except Exception as e:
+        logger.error(f"Failed to load {label} K8s config: {e}")
+        configuration = client.Configuration()
+
+    configuration.verify_ssl = False
+    return client.ApiClient(configuration)
+
+
 class K8sClient:
     """
     쿠버네티스 클러스터와의 통신을 관리합니다.
     서버 사이드 적용(Server-Side Apply)을 사용하여 리소스를 생성/업데이트합니다.
+
+    Karmada(멀티클러스터 전파 대상)와 호스트 클러스터(MaleWorkload 등 센트럴 전용
+    리소스)에 각각 별도의 ApiClient로 연결하고, 리소스 kind에 따라 적절한 쪽으로 보낸다.
     """
 
     def __init__(self):
-       # --- 카르마다 설정 파일을 우선적으로 로드하도록 변경 ---
-        karmada_config_path = "/etc/karmada/karmada-apiserver.config"
-        try:
-            if os.path.exists(karmada_config_path):
-                # 카르마다 전용 설정 로드
-                config.load_kube_config(config_file=karmada_config_path)
-                logger.info(f"Successfully loaded Karmada config from {karmada_config_path}")
-            else:
-                # 파일이 없을 경우 기본 설정 시도
-                try:
-                    config.load_incluster_config()
-                except config.ConfigException:
-                    config.load_kube_config()
-                logger.warning(f"Karmada config not found at {karmada_config_path}. Using default config.")
-        except Exception as e:
-            logger.error(f"Failed to load any K8s/Karmada config: {e}")
-            # 클러스터 내부에서 실행될 때의 설정
-           # config.load_incluster_config()
-       # except config.ConfigException:
-            # 로컬 환경에서 실행될 때 (개발용)
-         #   config.load_kube_config()
-
-#ssl검증 무시 설정
-        configuration = client.Configuration.get_default_copy()
-        configuration.verify_ssl = False
-        client.Configuration.set_default(configuration)
-
-        self.api_client = client.ApiClient()
+        self.karmada_api_client = _load_api_client(
+            "/etc/karmada/karmada-apiserver.config", fallback_incluster=True, label="Karmada")
+        self.host_api_client = _load_api_client(
+            "/root/.kube/config", fallback_incluster=True, label="Host cluster")
 
     def apply(self, manifest: dict, dry_run: bool = False) -> dict:
         """
@@ -58,6 +70,8 @@ class K8sClient:
 
         if not api_version or not kind or not name:
             raise ValueError("Resource manifest must contain apiVersion, kind, and metadata.name")
+
+        api_client = self.host_api_client if kind in HOST_ONLY_KINDS else self.karmada_api_client
 
         # 리소스 종류에 따른 복수형 이름(Plural) 결정
         plural_mapping = {
@@ -92,9 +106,10 @@ class K8sClient:
         }
 
         try:
-            logger.info(f"Applying {kind}/{name} in {namespace} (dry_run={dry_run}) via {path}")
-            
-            data, status, _ = self.api_client.call_api(
+            target = "host cluster" if kind in HOST_ONLY_KINDS else "Karmada"
+            logger.info(f"Applying {kind}/{name} in {namespace} (dry_run={dry_run}) via {path} [{target}]")
+
+            data, status, _ = api_client.call_api(
                 path, "PATCH",
                 path_params={},
                 query_params=query,
