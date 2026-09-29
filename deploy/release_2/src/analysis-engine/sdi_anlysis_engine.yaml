@@ -159,6 +159,6 @@ metadata:
 type: Opaque
 stringData:
   # InfluxDB 인증 토큰 (Metric-Collector의 influxdb-creds와 동일)
-  INFLUX_TOKEN: "my-super-secret-token"
+  INFLUX_TOKEN: "CHANGE_ME"
   # 레거시 호환용 파일 (deprecated)
-  influxDB-TOKEN.txt: "my-super-secret-token"
+  influxDB-TOKEN.txt: "CHANGE_ME"

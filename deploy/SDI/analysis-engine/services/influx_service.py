@@ -5,10 +5,10 @@ from influxdb_client import InfluxDBClient
 from datetime import datetime, timedelta
 
 # InfluxDB 설정
-INFLUX_URL = "http://10.0.5.52:32086"
-INFLUX_TOKEN = "6hZxFzOacf-6TlnlhDUWjLnp1EtefcY9ViBziEfEPeklZYgijfdQrslUenifowQZ7cMQmuHk74iToaGK6mEG-A=="
-INFLUX_ORG = "keti"
-INFLUX_BUCKET = "turtlebot"
+INFLUX_URL = os.getenv("INFLUX_URL", "http://10.0.5.52:32086")
+INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
+INFLUX_ORG = os.getenv("INFLUX_ORG", "keti")
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "turtlebot")
 
 #Edit 필요- 터틀봇 초기 정보를 읽어드림  수정해야할것 -> 초기 인플럭스 디비에서 읽어 들이게해야함 
 BOTS = ["TURTLEBOT3-Burger-1", "TURTLEBOT3-Burger-2"]

@@ -15,6 +15,21 @@ k8s_backup_*.tar.gz
 *-kubeconfig.yaml
 scripts/etri-setup/karmada/edge-cluster-kubeconfig.yaml
 
+# 자격증명
+influxDB-TOKEN.txt
+*influxdb-secret.yaml
+kubeadm-token
+*-TOKEN.txt
+*.token
+influxdb_token.txt
+*.key
+*.bak
+k3s-admin.yaml
+karmada.config
+clean-kubeconfig.yaml
+permanent-kubeconfig.yaml
+deploy/SDI/karmada/bin/
+
 # Karmada CRD 압축 해제 디렉토리
 scripts/etri-setup/karmada/crds/
 

@@ -2,11 +2,12 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime, timedelta, timezone
 import random
+import os
 
-INFLUX_URL    = "http://10.0.5.52:32086"  
-INFLUX_TOKEN  = "fZakVO_gqdb9Rk0zjORHw93jDCowJvAqX3Oe-wM7Eei_-95y3aNi0Za83eP5ehpyC1BBUa5F9XhjOcr73c_chw=="
-INFLUX_ORG    = "keti"
-INFLUX_BUCKET = "turtlebot"
+INFLUX_URL    = os.getenv("INFLUX_URL", "http://10.0.5.52:32086")
+INFLUX_TOKEN  = os.getenv("INFLUX_TOKEN")
+INFLUX_ORG    = os.getenv("INFLUX_ORG", "keti")
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "turtlebot")
 
 BOTS = ["TURTLEBOT3-Burger-1", "TURTLEBOT3-Burger-2"]  # 실제 터틀봇 호스트 이름
 

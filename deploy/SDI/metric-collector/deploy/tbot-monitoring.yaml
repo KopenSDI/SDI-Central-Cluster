@@ -17,7 +17,7 @@ kind: Secret
 metadata: { name: influxdb-creds, namespace: tbot-monitoring }
 type: Opaque
 stringData:
-  token: my-super-secret-token
+  token: CHANGE_ME
   username: admin
   password: "KETI123456789"
 

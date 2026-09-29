@@ -8,11 +8,10 @@ from influxdb_client import InfluxDBClient
 # INFLUX_TOKEN  = os.getenv("INFLUX_TOKEN")
 # INFLUX_ORG    = os.getenv("INFLUX_ORG", "keti")
 # INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "turtlebot")
-# admin 비밀번호 KETI1234567890
-INFLUX_URL    = "http://10.0.4.40:32086" 
-INFLUX_TOKEN  = "zpSNlr8I6RnFOhC5PqThCE1UelqkpUU8bkpEpTgC9b030Kzsk_7IC_CwqoDsHyErpMVEjMW-fuq2awhGMG9acg=="  
-INFLUX_ORG    = "keti"
-INFLUX_BUCKET = "turtlebot"
+INFLUX_URL    = os.getenv("INFLUX_URL", "http://10.0.4.40:32086")
+INFLUX_TOKEN  = os.getenv("INFLUX_TOKEN")
+INFLUX_ORG    = os.getenv("INFLUX_ORG", "keti")
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "turtlebot")
 
 # 실제 InfluxDB에서 조회되는 터틀봇들 (실제 데이터: Burger-1: 413.3Wh, Burger-2: 315.0Wh)
 BOTS = ["TURTLEBOT3-Burger-1", "TURTLEBOT3-Burger-2"]

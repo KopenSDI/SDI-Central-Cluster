@@ -1,2 +1,0 @@
-kubeadm join 10.0.4.40:6443 --token qaihsm.jcbls8f15okehhc7 \
-        --discovery-token-ca-cert-hash sha256:744920cb835ffa0e0b7f85af9f898878332f30b21c521f489a4e317a0db7a691 
