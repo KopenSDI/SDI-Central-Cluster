@@ -10,16 +10,16 @@ metadata: { name: rabbitmq-creds, namespace: tbot-monitoring }
 type: Opaque
 stringData:
   user: keti
-  pass: opensdi123
+  pass: CHANGE_ME
 ---
 apiVersion: v1
 kind: Secret
 metadata: { name: influxdb-creds, namespace: tbot-monitoring }
 type: Opaque
 stringData:
-  token: my-super-secret-token
+  token: CHANGE_ME
   username: keti
-  password: opensdi123
+  password: CHANGE_ME
 
 # ---------- Metric-Collector depolyment ----------
 ---

@@ -40,7 +40,7 @@ metadata:
   namespace: kube-system
 type: Opaque
 stringData:
-  token: EIysjcv6TQbMrGzcm5_yTXHIym_lFxmopNlDP7TyYwhyMdytzW-Qlb94dbep-vyZk8Mh-Lvc6Lq_qWfAHXyKMQ==
+  token: CHANGE_ME
 ---
 # 5) InfluxDB 접속 정보 ConfigMap
 apiVersion: v1

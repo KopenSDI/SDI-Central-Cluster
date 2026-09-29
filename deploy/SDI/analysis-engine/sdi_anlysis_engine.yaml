@@ -119,4 +119,4 @@ metadata:
   namespace: default
 type: Opaque
 data:
-  influxDB-TOKEN.txt: Zlpha1ZPX2dxZGI5UmswempPUkh3OTNqRENvd0p2QXFYM09lLXdNN0VlaV8tOTV5M2FOaTBaYTgzZVA1ZWhweUMxQkJVYTVGOVhoak9jcjczY19jaHc9PQ==
+  influxDB-TOKEN.txt: CHANGE_ME

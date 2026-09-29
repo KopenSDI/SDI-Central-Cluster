@@ -23,7 +23,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 # Configuration
 # ========================================================================================
 INFLUX_URL = os.getenv('INFLUX_URL', 'http://influxdb.keti-monitoring.svc.cluster.local:8086')
-INFLUX_TOKEN = os.getenv('INFLUX_TOKEN', 'my-super-secret-token')
+INFLUX_TOKEN = os.getenv('INFLUX_TOKEN')
 INFLUX_ORG = os.getenv('INFLUX_ORG', 'keti')
 INFLUX_BUCKET = os.getenv('INFLUX_BUCKET', 'federation')
 API_TOKEN = os.getenv('API_TOKEN', 'temp-token-for-testing')
